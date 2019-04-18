@@ -141,65 +141,6 @@ func readTable() {
 }
 
 /*
-//remove
-func GetAssetHistory() {
-
-	CSSPath := "html body.i-user_logged_no.i-user_client_no div.finam-wrap div.finam-global-container div.content div.layout table.main tbody tr td#content-block.inside-container.content div#issuer-profile div#issuer-profile-container div#issuer-profile-outer div#issuer-profile-inner div#issuer-profile-content div#issuer-profile-export div#issuer-profile-export-form"
-
-
-	//We can use POST form to get result, too.
-	res, err := http.PostForm("https://www.finam.ru/profile/moex-akcii/lukoil/export",
-		nil)//url.Values{"pageNumber": {page}})
-	if err != nil {
-		//panic(err)
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-	} else {
-		// Load the HTML document
-		doc, err := goquery.NewDocumentFromReader(res.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// Find the table items
-		doc.Find(CSSPath).Each(func (i int, s *goquery.Selection) {
-			// For each item found
-			id,_ := s.Find(CSSPath + " form").Attr("id")
-			class,_ := s.Find(CSSPath + " form").Attr("class")
-			name,_ := s.Find(CSSPath + " form").Attr("name")
-			action,_ := s.Find(CSSPath + " form").Attr("action")
-			method,_ := s.Find(CSSPath + " form").Attr("method")
-			fmt.Println("id:",id)
-			fmt.Println("class:",class)
-			fmt.Println("name:",name)
-			fmt.Println("action:",action)
-			fmt.Println("method:",method)
-
-			s.Find(CSSPath + " form input").Each(func (i int, s1 *goquery.Selection) {
-				id,_ := s1.Attr("id")
-				//typ,_ := s1.Attr("type")
-				name,_ := s1.Attr("name")
-				value,_ := s1.Attr("value")
-				fmt.Println(" *****")
-				fmt.Println(" id:",id)
-				//fmt.Println(" type:",typ)
-				fmt.Println(" name:",name)
-				fmt.Println(" value:",value)
-			})
-
-			s.Find(CSSPath + "form table").Each(func (i int, s1 *goquery.Selection) {
-				f := s1.Find("tr").Text()
-				fmt.Println("f:",f)
-
-			})
-		})
-	}
-}
-*/
-/*
 Как получить элемент с помощью jQuery?
 Для того чтобы понимать как работает селектор Вам все-же необходимы базовые знания CSS, т.к. именно от принципов CSS отталкивается селектор jQuery:
 
@@ -266,34 +207,105 @@ func getAssetParams() {
 }
 
 /*
-Для того чтобы написать функцию обращения к серверу «ФИНАМ» (а писать мы будем ее на Python), еще раз рассмотрим параметры GET запроса:
+Для того чтобы написать функцию обращения к серверу «ФИНАМ», еще раз рассмотрим параметры GET запроса:
+
 http://export.finam.ru/POLY_170620_170623.txt?
-	market=1&em=175924&code=POLY&apply=0&df=20&mf=5&yf=2017&from=20.06.2017&dt=23&
-	mt=5&yt=2017&to=23.06.2017&p=8&f=POLY_170620_170623&e=.txt&cn=POLY&dtf=1&tmf=1&
-	MSOR=1&mstime=on&mstimever=1&sep=1&sep2=1&datf=1&at=1
+market=1
+&em=175924
+&code=POLY
+&apply=0
+&df=20
+&mf=5
+&yf=2017
+&from=20.06.2017
+&dt=23
+&mt=5
+&yt=2017
+&to=23.06.2017
+&p=8
+&f=POLY_170620_170623
+&e=.txt
+&cn=POLY
+&dtf=1
+&tmf=1
+&MSOR=1
+&mstime=on
+&mstimever=1
+&sep=1
+&sep2=1
+&datf=1
+&at=1
 
 POLY_170620_170623 – очевидно, что данная строка представляет параметр code, а также временные характеристики.
+.txt – расширение файла; расширение упоминается в параметре e; 
 
-.txt – расширение файла; расширение упоминается в параметре e; при написании функции следует помнить об этом нюансе. 
+NOTE: при написании функции следует помнить об этом нюансе. 
 
 Примем также во внимание содержимое исходного кода страницы типа www.finam.ru/profile/moex-akcii/gazprom/export внутри тэга form (где name=«exportdata»). Характеризуем показатели.
 
-market, em, code – об этих параметрах, упоминал ранее, при обращении к функции их значения будут приниматься из файла.
 Среди всего перечня хотелось бы акцентировать внимание на параметрах em, market, code. 
-em параметр следует понимать как индекс, своеобразную метку бумаги (инструмента). Если мы хотим скачивать не один инструмент, а массив данных по нескольким бумагам (инструментам) мы должны знать em каждого из них. 
-market говорит о том, где вращается данная бумага (инструмент) – на каком рынке? Маркетов много: МосБиржа топ***, МосБиржа пифы***, МосБиржа облигации***, Расписки и т.д. 
+
+em — параметр следует понимать как индекс, своеобразную метку бумаги (инструмента).
+		Если мы хотим скачивать не один инструмент, а массив данных по нескольким бумагам 
+		k(инструментам) мы должны знать em каждого из них. 
+market — говорит о том, где вращается данная бумага (инструмент) – на каком рынке? 
+		Маркетов много: МосБиржа топ***, МосБиржа пифы***, МосБиржа облигации***, Расписки и т.д. 
 code – это символьная переменная по инструменту. 
 df, mf, yf, from, dt, mt, yt, to – это параметры времени.
-p — период котировок (1 - тики, 2 - 1 мин., 3 - 5 мин., 4 - 10 мин., 5 - 15 мин., 6 -  30 мин., 7 - 1 час, 8 - 1 день,9 - 1 неделя, 10 - 1 месяц)
-e – расширение получаемого файла; возможны варианты — .txt либо .csv
-dtf — формат даты (1 — ггггммдд, 2 — ггммдд, 3 — ддммгг, 4 — дд/мм/гг, 5 — мм/дд/гг)
-tmf — формат времени (1 — ччммсс, 2 — ччмм, 3 — чч: мм: сс, 4 — чч: мм)
-MSOR — выдавать время (0 — начала свечи, 1 — окончания свечи)
-mstimever — выдавать время (НЕ московское — mstimever=0; московское — mstime='on', mstimever='1')
-sep — параметр разделитель полей (1 — запятая (,), 2 — точка (.), 3 — точка с запятой (;), 4 — табуляция (»), 5 — пробел ( ))
-sep2 — параметр разделитель разрядов (1 — нет, 2 — точка (.), 3 — запятая (,), 4 — пробел ( ), 5 — кавычка ('))
-datf — Перечень получаемых данных (#1 — TICKER, PER, DATE, TIME, OPEN, HIGH, LOW, CLOSE, VOL; #2 — TICKER, PER, DATE, TIME, OPEN, HIGH, LOW, CLOSE; #3 — TICKER, PER, DATE, TIME, CLOSE, VOL; #4 — TICKER, PER, DATE, TIME, CLOSE; #5 — DATE, TIME, OPEN, HIGH, LOW, CLOSE, VOL; #6 — DATE, TIME, LAST, VOL, ID, OPER).
-at — добавлять заголовок в файл (0 — нет, 1 — да)
+p — период котировок (
+		1 - тики, 
+		2 - 1 мин.,
+		3 - 5 мин.,
+		4 - 10 мин.,
+		5 - 15 мин.,
+		6 -  30 мин.,
+		7 - 1 час,
+		8 - 1 день,
+		9 - 1 неделя,
+		10 - 1 месяц)
+e – расширение получаемого файла( 
+		.txt
+		.csv)
+dtf — формат даты (
+		1 — ггггммдд,
+		2 — ггммдд,
+		3 — ддммгг,
+		4 — дд/мм/гг,
+		5 — мм/дд/гг)
+tmf — формат времени (
+		1 — ччммсс,
+		2 — ччмм,
+		3 — чч: мм: сс,
+		4 — чч: мм)
+MSOR — выдавать время (
+		0 — начала свечи,
+		1 — окончания свечи)
+mstimever — выдавать время (
+		НЕ московское — mstimever=0; 
+		московское — mstime='on', 
+		mstimever='1')
+sep — параметр разделитель полей (
+		1 — запятая (,),
+		2 — точка (.),
+		3 — точка с запятой (;),
+		4 — табуляция (»),
+		5 — пробел ( ))
+sep2 — параметр разделитель разрядов (
+		1 — нет,
+		2 — точка (.),
+		3 — запятая (,),
+		4 — пробел ( ),
+		5 — кавычка ('))
+datf — Перечень получаемых данных (FIXME: венрно ли это здесь?
+		1 — TICKER, PER, DATE, TIME, OPEN, HIGH, LOW, CLOSE, VOL; 
+		2 — TICKER, PER, DATE, TIME, OPEN, HIGH, LOW, CLOSE; 
+		3 — TICKER, PER, DATE, TIME, CLOSE, VOL; 
+		4 — TICKER, PER, DATE, TIME, CLOSE; 
+		5 — DATE, TIME, OPEN, HIGH, LOW, CLOSE, VOL; 
+		6 — DATE, TIME, LAST, VOL, ID, OPER).
+at — добавлять заголовок в файл (
+		0 — нет, 
+		1 — да)
 */
 func downloadAssetHistory() {
 	// общие параметры
@@ -371,6 +383,17 @@ func downloadAssetHistory() {
 }
 
 
+/*
+	Алгоритм
+	TODO: для каждого рынка[Акции,Облигации?] 
+		для каждого иструмента 
+			-получить страницу для загрузки данных истории
+			-на странице загрузки итории получить параметры требуемы для загрузки
+			-сформировать запрос для загрузки данных и загрузить данные истории
+*/
+
+
+
 //
 // main driver
 //
@@ -380,10 +403,8 @@ func main() {
 	getAssetParams()
 	downloadAssetHistory()
 
+}
 
-
-	//GetAssetHistory()
-	//ExampleScrape()
 
 
 
@@ -410,5 +431,62 @@ func main() {
 	body, err = ioutil.ReadAll(resp.Body)
 	fmt.Println("post:\n", keepLines(string(body), 3))
 */
-}
+/*
+//remove
+func GetAssetHistory() {
 
+	CSSPath := "html body.i-user_logged_no.i-user_client_no div.finam-wrap div.finam-global-container div.content div.layout table.main tbody tr td#content-block.inside-container.content div#issuer-profile div#issuer-profile-container div#issuer-profile-outer div#issuer-profile-inner div#issuer-profile-content div#issuer-profile-export div#issuer-profile-export-form"
+
+
+	//We can use POST form to get result, too.
+	res, err := http.PostForm("https://www.finam.ru/profile/moex-akcii/lukoil/export",
+		nil)//url.Values{"pageNumber": {page}})
+	if err != nil {
+		//panic(err)
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+	} else {
+		// Load the HTML document
+		doc, err := goquery.NewDocumentFromReader(res.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Find the table items
+		doc.Find(CSSPath).Each(func (i int, s *goquery.Selection) {
+			// For each item found
+			id,_ := s.Find(CSSPath + " form").Attr("id")
+			class,_ := s.Find(CSSPath + " form").Attr("class")
+			name,_ := s.Find(CSSPath + " form").Attr("name")
+			action,_ := s.Find(CSSPath + " form").Attr("action")
+			method,_ := s.Find(CSSPath + " form").Attr("method")
+			fmt.Println("id:",id)
+			fmt.Println("class:",class)
+			fmt.Println("name:",name)
+			fmt.Println("action:",action)
+			fmt.Println("method:",method)
+
+			s.Find(CSSPath + " form input").Each(func (i int, s1 *goquery.Selection) {
+				id,_ := s1.Attr("id")
+				//typ,_ := s1.Attr("type")
+				name,_ := s1.Attr("name")
+				value,_ := s1.Attr("value")
+				fmt.Println(" *****")
+				fmt.Println(" id:",id)
+				//fmt.Println(" type:",typ)
+				fmt.Println(" name:",name)
+				fmt.Println(" value:",value)
+			})
+
+			s.Find(CSSPath + "form table").Each(func (i int, s1 *goquery.Selection) {
+				f := s1.Find("tr").Text()
+				fmt.Println("f:",f)
+
+			})
+		})
+	}
+}
+*/
