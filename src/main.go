@@ -15,9 +15,29 @@ import (
 
 	// page parser
   "github.com/PuerkitoBio/goquery"
+
 )
+// toUtf8 conversin
+// https://stackoverflow.com/questions/6927611/go-language-how-to-convert-ansi-text-to-utf8
+import "golang.org/x/text/encoding/charmap"
 
 
+// Win1251toUtf8 and Win1251fromUtf8 conversin
+// https://stackoverflow.com/questions/6927611/go-language-how-to-convert-ansi-text-to-utf8
+func DecodeWindows1251(enc []byte) string {
+	dec := charmap.Windows1251.NewDecoder()
+	out, _ := dec.Bytes(enc)
+	return string(out)
+}
+
+func EncodeWindows1250(inp string) []byte {
+	enc := charmap.Windows1251.NewEncoder()
+	out, _ := enc.String(inp)
+	// For converting from a string to a byte slice, string -> []byte:
+	// https://stackoverflow.com/questions/8032170/how-to-assign-string-to-bytes-array
+	// []byte(str)
+	return []byte(out)
+}
 
 //
 // пример использования библиотеки goquery
@@ -59,41 +79,10 @@ func keepLines(s string, n int) string {
 func GetAssetsList() {
 	var CSSPath string
 
-/*
-  // Request the HTML page.
-  res, err := http.Get("https://www.finam.ru/quotes/stocks/russia/")
-  if err != nil {
-    log.Fatal(err)
-  }
-  defer res.Body.Close()
-  if res.StatusCode != 200 {
-    log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-  }
-
-  // Load the HTML document
-  doc, err := goquery.NewDocumentFromReader(res.Body)
-  if err != nil {
-    log.Fatal(err)
-  }
-
-
-
-	 Find the table items
-  doc.Find(CSSPath).Each(func(i int, s *goquery.Selection) {
-    // For each item found, get the band and title
-		f := s.Find("td").Text()
-		fmt.Println("f:", f)
-  })
-
-*/
-
 	CSSPath = "html body.i-user_client_no.i-user_client_no div table tbody"
 
 	stop := false
 	for i := 1; i < 100 && !stop; i++ {
-		fmt.Println()
-		fmt.Println("  POST  page ",i)
-		fmt.Println()
 
 		// convert to string
 		page := fmt.Sprintf("%d", i)
@@ -104,12 +93,20 @@ func GetAssetsList() {
 		if err != nil {
 			//panic(err)
 			log.Fatal(err)
+			return
 		}
 		defer res.Body.Close()
+
 		if res.StatusCode != 200 {
 			//log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
 			stop = true
+			fmt.Println("  DONE ")
 		} else {
+
+			fmt.Println("*******************")
+			fmt.Println(" POST  page ",i)
+			fmt.Println("*******************")
+
 			// Load the HTML document
 			doc, err := goquery.NewDocumentFromReader(res.Body)
 			if err != nil {
@@ -124,22 +121,26 @@ func GetAssetsList() {
 					title,_ := s1.Find("a").Attr("title")
 					fmt.Println("href:", href)
 					fmt.Println("title:", title)
-
-					s1.Find("td").Each( func (i int, s2 *goquery.Selection) {
-						f := s2.Find("span").Text()
-						fmt.Println("f:", f)
-					})
+					t := DecodeWindows1251([]byte(title))
+					fmt.Println("t:",t)
+					// цифры
+					//s1.Find("td").Each( func (i int, s2 *goquery.Selection) {
+					//	f := s2.Find("span").Text()
+					//	fmt.Println("f:", f)
+					//})
 				})
 			})
 		}
 	}
+}
+
+func readTable() {
 
 }
 
+/*
 //remove
 func GetAssetHistory() {
-//	CSSPath := "html body.i-user_logged_no.i-user_client_no div.finam-wrap div.finam-global-container div.content div.layout table.main tbody tr td#content-block.inside-container.content div#issuer-profile div#issuer-profile-container div#issuer-profile-outer div#issuer-profile-inner div#issuer-profile-content div#issuer-profile-export div#issuer-profile-export-form form#chartform.i-form-state"
-
 
 	CSSPath := "html body.i-user_logged_no.i-user_client_no div.finam-wrap div.finam-global-container div.content div.layout table.main tbody tr td#content-block.inside-container.content div#issuer-profile div#issuer-profile-container div#issuer-profile-outer div#issuer-profile-inner div#issuer-profile-content div#issuer-profile-export div#issuer-profile-export-form"
 
@@ -195,7 +196,7 @@ func GetAssetHistory() {
 		})
 	}
 }
-
+*/
 /*
 Как получить элемент с помощью jQuery?
 Для того чтобы понимать как работает селектор Вам все-же необходимы базовые знания CSS, т.к. именно от принципов CSS отталкивается селектор jQuery:
@@ -206,6 +207,8 @@ $(“div#content .photo”) – получить все элементы с кл
 $(“ul li”) – получить все <li> элементы из списка <ul>
 $(“ul li:first”) – получить только первый элемент <li> из списка <ul>
 */
+
+// получить параметры по каждому интсрументу
 func accessElem() {
 	//We can use POST form to get result, too.
 	res, err := http.PostForm("https://www.finam.ru/profile/moex-akcii/lukoil/export",
@@ -261,9 +264,10 @@ func accessElem() {
 
 /*
 Для того чтобы написать функцию обращения к серверу «ФИНАМ» (а писать мы будем ее на Python), еще раз рассмотрим параметры GET запроса:
-__http://export.finam.ru/POLY_170620_170623.txt?market=1&em=175924&code=POLY&apply=0&df=20&mf=5&yf=2017&from=20.06.2017&dt=23&
-mt=5&yt=2017&to=23.06.2017&p=8&f=POLY_170620_170623&e=.txt&cn=POLY&dtf=1&tmf=1&
-MSOR=1&mstime=on&mstimever=1&sep=1&sep2=1&datf=1&at=1
+http://export.finam.ru/POLY_170620_170623.txt?
+	market=1&em=175924&code=POLY&apply=0&df=20&mf=5&yf=2017&from=20.06.2017&dt=23&
+	mt=5&yt=2017&to=23.06.2017&p=8&f=POLY_170620_170623&e=.txt&cn=POLY&dtf=1&tmf=1&
+	MSOR=1&mstime=on&mstimever=1&sep=1&sep2=1&datf=1&at=1
 
 POLY_170620_170623 – очевидно, что данная строка представляет параметр code, а также временные характеристики.
 
@@ -323,11 +327,10 @@ func downloadAssetHistory() {
 	// наименование выходного файла
 	f := code + "_" + "180101" + "_" + "190417"
 
-	//Req := "http://export.finam.ru/POLY_170620_170623.txt?market=1&em=175924&code=POLY&apply=0&df=20&mf=5&yf=2017&from=20.06.2017&dt=23&mt=5&yt=2017&to=23.06.2017&p=8&f=POLY_170620_170623&e=.txt&cn=POLY&dtf=1&tmf=1&SOR=1&mstime=on&mstimever=1&sep=1&sep2=1&datf=1&at=1"
+	// http://export.finam.ru/POLY_170620_170623.txt?market=1&em=175924&code=POLY&apply=0&df=20&mf=5&yf=2017&from=20.06.2017&dt=23&mt=5&yt=2017&to=23.06.2017&p=8&f=POLY_170620_170623&e=.txt&cn=POLY&dtf=1&tmf=1&SOR=1&mstime=on&mstimever=1&sep=1&sep2=1&datf=1&at=1
 
 	req := "http://export.finam.ru/"+f+e+"?market="+market+"&em="+em+"&code="+code+"&apply="+apply+"&df="+df+"&mf="+mf+"&yf="+yf+"&from="+from+"&dt="+dt+"&mt="+mt+"&yt="+yt+"&to="+to+"&p="+p+"&f="+f+"&e="+e+"&cn="+code+"&dtf="+dtf+"&tmf="+tmf+"&SOR="+MSOR+"&mstime="+mstime+"&mstimever="+mstimever+"&sep="+sep+"&sep2="+sep2+"&datf="+datf+"&at="+at
 	fmt.Println("request:",req)
-
 
   // Request the HTML page.
   res, err := http.Get(req)
@@ -344,23 +347,6 @@ func downloadAssetHistory() {
 		fmt.Println(string(body))
 	}
 
-/*
-  // Load the HTML document
-  doc, err := goquery.NewDocumentFromReader(res.Body)
-  if err != nil {
-    log.Fatal(err)
-  }
-
-
-
-	 Find the table items
-  doc.Find(CSSPath).Each(func(i int, s *goquery.Selection) {
-    // For each item found, get the band and title
-		f := s.Find("td").Text()
-		fmt.Println("f:", f)
-  })
-
-*/
 }
 
 
@@ -368,13 +354,17 @@ func downloadAssetHistory() {
 // main driver
 //
 func main() {
-//	ExampleScrape()
 
 	//accessElem()
-	downloadAssetHistory()
-	//GetAssetsList()
+	//downloadAssetHistory()
+	GetAssetsList()
+
+
 
 	//GetAssetHistory()
+	//ExampleScrape()
+
+
 
 /*
 	// Go contains rich function for grab web contents. net/http is the major library
