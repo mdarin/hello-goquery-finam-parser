@@ -12,14 +12,15 @@ import (
 	"net/url"
 	"io/ioutil"
 	"strings"
+	"regexp"
 
 	// page parser
   "github.com/PuerkitoBio/goquery"
 
+	// toUtf8 conversin
+	// https://stackoverflow.com/questions/6927611/go-language-how-to-convert-ansi-text-to-utf8
+	"golang.org/x/text/encoding/charmap"
 )
-// toUtf8 conversin
-// https://stackoverflow.com/questions/6927611/go-language-how-to-convert-ansi-text-to-utf8
-import "golang.org/x/text/encoding/charmap"
 
 
 // Win1251toUtf8 and Win1251fromUtf8 conversin
@@ -76,7 +77,7 @@ func keepLines(s string, n int) string {
 
 
 //TODO: inprove
-func GetAssetsList() {
+func getAssetsList() {
 	var CSSPath string
 
 	CSSPath = "html body.i-user_client_no.i-user_client_no div table tbody"
@@ -103,9 +104,11 @@ func GetAssetsList() {
 			fmt.Println("  DONE ")
 		} else {
 
+			fmt.Println()
 			fmt.Println("*******************")
 			fmt.Println(" POST  page ",i)
 			fmt.Println("*******************")
+			fmt.Println()
 
 			// Load the HTML document
 			doc, err := goquery.NewDocumentFromReader(res.Body)
@@ -119,10 +122,9 @@ func GetAssetsList() {
 				s.Find("tr").Each(func (i int, s1 *goquery.Selection) {
 					href,_ := s1.Find("a").Attr("href")
 					title,_ := s1.Find("a").Attr("title")
+					fmt.Println()
 					fmt.Println("href:", href)
-					fmt.Println("title:", title)
-					t := DecodeWindows1251([]byte(title))
-					fmt.Println("t:",t)
+					fmt.Println("title:", DecodeWindows1251([]byte(title)))
 					// цифры
 					//s1.Find("td").Each( func (i int, s2 *goquery.Selection) {
 					//	f := s2.Find("span").Text()
@@ -209,7 +211,8 @@ $(“ul li:first”) – получить только первый элемен
 */
 
 // получить параметры по каждому интсрументу
-func accessElem() {
+//func accessElem() {
+func getAssetParams() {
 	//We can use POST form to get result, too.
 	res, err := http.PostForm("https://www.finam.ru/profile/moex-akcii/lukoil/export",
 		nil)//url.Values{"pageNumber": {page}})
@@ -255,7 +258,7 @@ func accessElem() {
 				if id3 != "" {
 					fmt.Println(" id3:",id3)
 					text := s.Find("#"+id3+" td").First().Text()
-					fmt.Println("text:",text)
+					fmt.Println("text:",DecodeWindows1251([]byte(text)))
 				}
 			})
 		})
@@ -276,6 +279,10 @@ POLY_170620_170623 – очевидно, что данная строка пре
 Примем также во внимание содержимое исходного кода страницы типа www.finam.ru/profile/moex-akcii/gazprom/export внутри тэга form (где name=«exportdata»). Характеризуем показатели.
 
 market, em, code – об этих параметрах, упоминал ранее, при обращении к функции их значения будут приниматься из файла.
+Среди всего перечня хотелось бы акцентировать внимание на параметрах em, market, code. 
+em параметр следует понимать как индекс, своеобразную метку бумаги (инструмента). Если мы хотим скачивать не один инструмент, а массив данных по нескольким бумагам (инструментам) мы должны знать em каждого из них. 
+market говорит о том, где вращается данная бумага (инструмент) – на каком рынке? Маркетов много: МосБиржа топ***, МосБиржа пифы***, МосБиржа облигации***, Расписки и т.д. 
+code – это символьная переменная по инструменту. 
 df, mf, yf, from, dt, mt, yt, to – это параметры времени.
 p — период котировок (1 - тики, 2 - 1 мин., 3 - 5 мин., 4 - 10 мин., 5 - 15 мин., 6 -  30 мин., 7 - 1 час, 8 - 1 день,9 - 1 неделя, 10 - 1 месяц)
 e – расширение получаемого файла; возможны варианты — .txt либо .csv
@@ -325,12 +332,26 @@ func downloadAssetHistory() {
 	//добавлять заголовок в файл
 	at := "1"
 	// наименование выходного файла
-	f := code + "_" + "180101" + "_" + "190417"
+	// https://golang.org/pkg/regexp/#pkg-examples
+	re := regexp.MustCompile(`(?P<day>[0-9]+)[.](?P<month>[0-9]+)[.][0-9]{2,2}(?P<year>[0-9]{2,2})`)
+	fromPart := fmt.Sprintf("${%s}${%s}${%s}", re.SubexpNames()[3], re.SubexpNames()[2], re.SubexpNames()[1])
+	toPart := fmt.Sprintf("${%s}${%s}${%s}", re.SubexpNames()[3], re.SubexpNames()[2], re.SubexpNames()[1])
+	fromName := re.ReplaceAllString(from, fromPart)
+	toName := re.ReplaceAllString(to, toPart)
+	f := code + "_" + fromName + "_" + toName
+	//fmt.Println("from:",re.MatchString(from))
+	//fmt.Println("to:",re.MatchString(to))
+	//fmt.Println("fromPart:",re.MatchString(from))
+	//fmt.Println("toPart:",re.MatchString(to))
+	//fmt.Println("fromName:",fromName)
+	//fmt.Println("toName:",toName)
 
 	// http://export.finam.ru/POLY_170620_170623.txt?market=1&em=175924&code=POLY&apply=0&df=20&mf=5&yf=2017&from=20.06.2017&dt=23&mt=5&yt=2017&to=23.06.2017&p=8&f=POLY_170620_170623&e=.txt&cn=POLY&dtf=1&tmf=1&SOR=1&mstime=on&mstimever=1&sep=1&sep2=1&datf=1&at=1
 
+	// запрос истории иснтрумента с указанными параметрами
 	req := "http://export.finam.ru/"+f+e+"?market="+market+"&em="+em+"&code="+code+"&apply="+apply+"&df="+df+"&mf="+mf+"&yf="+yf+"&from="+from+"&dt="+dt+"&mt="+mt+"&yt="+yt+"&to="+to+"&p="+p+"&f="+f+"&e="+e+"&cn="+code+"&dtf="+dtf+"&tmf="+tmf+"&SOR="+MSOR+"&mstime="+mstime+"&mstimever="+mstimever+"&sep="+sep+"&sep2="+sep2+"&datf="+datf+"&at="+at
 	fmt.Println("request:",req)
+
 
   // Request the HTML page.
   res, err := http.Get(req)
@@ -355,9 +376,9 @@ func downloadAssetHistory() {
 //
 func main() {
 
-	//accessElem()
-	//downloadAssetHistory()
-	GetAssetsList()
+	getAssetsList()
+	getAssetParams()
+	downloadAssetHistory()
 
 
 
