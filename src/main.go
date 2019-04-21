@@ -543,6 +543,9 @@ func dirEx() {
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		fmt.Println("file \""+filename+"\" does not exist")
 	}
+
+	fmt.Println("args[0]:",os.Args[0])
+	fmt.Println("base:",filepath.Dir(os.Args[0]))
 }
 
 func mapEx() {
@@ -626,13 +629,23 @@ func mapEx() {
 //
 func main() {
 
-	getAssetsList()
+	markets := []string{
+		"https://www.finam.ru/quotes/stocks/russia/", //- Акции российкий фондовый рынок
+		"https://www.finam.ru/quotes/indices/", // - Индексы
+		"https://www.finam.ru/quotes/bonds/", // - Облигации
+	}
+
+	for _,m := range markets {
+		fmt.Println("market:",m)
+		list := strings.Split(m,"/")
+		fmt.Println("list:",list[len(list)-3:])
+	}
+	//getAssetsList()
 
 	//getAssetParams()
 	//downloadAssetHistory()
 
-// request: http://export.finam.ru/LKOH_190419_190421.csv?market=1&em=8&code=LKOH&apply=0&df=19&mf=04&yf=2019&from=19.04.2019&dt=21&mt=3&yt=2019&to=21.04.2019&p=&f=LKOH_190419_190421&e=.csv&cn=LKOH&dtf=1&tmf=1&SOR=0&mstime=on&mstimever=1&sep=3&sep2=2&datf=1&at=1
-	downloadEx()
+	//downloadEx()
 	dirEx()
 	//mapEx()
 
