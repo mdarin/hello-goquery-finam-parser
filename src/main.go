@@ -34,6 +34,10 @@ import (
 
 //TODO: обязательно добавить таймауты на заросы!!
 
+
+// по регэкспам https://shapeshed.com/golang-regexp/
+
+
 const(
 
 )
