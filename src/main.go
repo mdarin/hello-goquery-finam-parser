@@ -16,6 +16,7 @@ import (
 	"strings"
 	"regexp"
 	"os" // for operations with dirs
+	"time" // for sleep
 	//NOTE: The path package should only be used for paths separated by forward slashes, 
 	//      such as the paths in URLs. This package does not deal with Windows paths with 
 	//      drive letters or backslashes; to manipulate operating system paths, use the path/filepath package.
@@ -33,6 +34,7 @@ import (
 )
 
 //TODO: обязательно добавить таймауты на заросы!!
+// https://medium.com/@nate510/don-t-use-go-s-default-http-client-4804cb19f779
 
 
 // по регэкспам https://shapeshed.com/golang-regexp/
@@ -128,6 +130,8 @@ func getAssetsList() {
 					//})
 					//получить параметры актива перейдя по ссылке и выбрав требуемые значения полей
 					getAssetParams(href,title)
+					// выдержка перед следующем запросом
+					time.Sleep(1000 * 2 * time.Millisecond)
 				})
 			})
 		}
@@ -224,16 +228,16 @@ func getAssetParams(href,title string) {
 		// неизветный
 		params["apply"] = "0"
 		//параметры времени.
-		//params["df"] = "1"
-		//params["mf"] = "1"
-		//params["yf"] = "2018"
-		//params["from"] = "01.01.2018"
+		params["df"] = "1"
+		params["mf"] = "1"
+		params["yf"] = "2018"
+		params["from"] = strings.Join([]string{params["df"],params["mf"],params["yf"]},".")//"01.01.2018"
 		//params["dt"] = "17"
 		//params["mt"] = "4"
 		//params["yt"] = "2019"
 		//params["to"] = "17.04.2019"
 		//период котировок
-		//params["p"] = "8" // дни
+		params["p"] = "8" // дни
 		//расширение получаемого файла
 		params["e"] = ".csv"
 		//формат даты
@@ -411,12 +415,19 @@ func downloadAssetHistory(params map[string]string) {
 	toName := re.ReplaceAllString(to, toPart)
 	f := code + "_" + fromName + "_" + toName
 
-	//TODO: можно собрать и из хэша, но надо аккуратно см.пробник mapEx()
+	//fmt.Println("from:",re.MatchString(from))
+	//fmt.Println("to:",re.MatchString(to))
+	//fmt.Println("fromPart:",re.MatchString(from))
+	//fmt.Println("toPart:",re.MatchString(to))
+	//fmt.Println("fromName:",fromName)
+	//fmt.Println("toName:",toName)
+
+	//TODO: можно собрать и из хэша, но надо аккуратно см.пробник mapEx(), там есть нюансы возможно порядок следования аргументов имеет значение
 	// запрос истории иснтрумента с указанными параметрами
 	req := "http://export.finam.ru/"+f+e+"?market="+market+"&em="+em+"&code="+code+"&apply="+apply+"&df="+df+"&mf="+mf+"&yf="+yf+"&from="+from+"&dt="+dt+"&mt="+mt+"&yt="+yt+"&to="+to+"&p="+p+"&f="+f+"&e="+e+"&cn="+code+"&dtf="+dtf+"&tmf="+tmf+"&SOR="+MSOR+"&mstime="+mstime+"&mstimever="+mstimever+"&sep="+sep+"&sep2="+sep2+"&datf="+datf+"&at="+at
 	fmt.Println("request:",req)
 
-/*
+
 	// Request the HTML page.
 	res, err := http.Get(req)
 	if err != nil {
@@ -431,7 +442,7 @@ func downloadAssetHistory(params map[string]string) {
 		//fmt.Println(keepLines(string(body)))
 		fmt.Println(string(body))
 	}
-*/
+
 }
 
 
@@ -536,6 +547,9 @@ func dirEx() {
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		fmt.Println("file \""+filename+"\" does not exist")
 	}
+
+	fmt.Println("args[0]:",os.Args[0])
+	fmt.Println("base:",filepath.Dir(os.Args[0]))
 }
 
 func mapEx() {
@@ -563,7 +577,7 @@ func mapEx() {
   //формат времени
   params["tmf"] ="1"
   //выдавать время
-  params["MSOR"] = "0"
+  params["SOR"] = "0"
   params["mstimever"] = "1"
   params["mstime"] = "on"
   //параметр разделитель полей
@@ -579,8 +593,8 @@ func mapEx() {
 	toPart := fmt.Sprintf("${%s}${%s}${%s}", re.SubexpNames()[3], re.SubexpNames()[2], re.SubexpNames()[1])
 	fromName := re.ReplaceAllString(params["from"], fromPart)
 	toName := re.ReplaceAllString(params["to"], toPart)
-	t := params["code"] + "_" + fromName + "_" + toName
-	params["f"] = t + params["e"]
+	params["f"] = params["code"] + "_" + fromName + "_" + toName
+	t := params["f"] + params["e"]
 
 	// сформировать запрос истории иснтрумента с указанными параметрами
 	req := "http://export.finam.ru/" + t
@@ -619,7 +633,19 @@ func mapEx() {
 //
 func main() {
 
-	getAssetsList()
+	markets := []string{
+		"https://www.finam.ru/quotes/stocks/russia/", //- Акции российкий фондовый рынок
+		"https://www.finam.ru/quotes/indices/", // - Индексы
+		"https://www.finam.ru/quotes/bonds/", // - Облигации
+	}
+
+	for _,m := range markets {
+		fmt.Println("market:",m)
+		list := strings.Split(m,"/")
+		fmt.Println("list:",list[len(list)-3:])
+	}
+	//getAssetsList()
+
 	//getAssetParams()
 	//downloadAssetHistory()
 
