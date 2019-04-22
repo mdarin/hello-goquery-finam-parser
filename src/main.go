@@ -74,7 +74,7 @@ func keepLines(s string, n int) string {
 
 
 //TODO: inprove
-func getAssetsList() {
+func getAssetsList(dir string) {
 	stop := false
 	for i := 1; i < 100 && !stop; i++ {
 
@@ -97,12 +97,6 @@ func getAssetsList() {
 			fmt.Println("  DONE ")
 		} else {
 
-			fmt.Println()
-			fmt.Println("*******************")
-			fmt.Println(" POST  page ",i)
-			fmt.Println("*******************")
-			fmt.Println()
-
 			// Load the HTML document
 			doc, err := goquery.NewDocumentFromReader(res.Body)
 			if err != nil {
@@ -121,6 +115,7 @@ func getAssetsList() {
 					//convert to utf-8
 					title = DecodeWindows1251([]byte(title))
 					fmt.Println()
+					fmt.Println("page:["+page+"]")
 					fmt.Println("tr href:", href)
 					fmt.Println("tr title:", title)
 					// цифры
@@ -129,7 +124,7 @@ func getAssetsList() {
 					//	fmt.Println("span value:", spanValue)
 					//})
 					//получить параметры актива перейдя по ссылке и выбрав требуемые значения полей
-					getAssetParams(href,title)
+					getAssetParams(href,title,dir)
 					// выдержка перед следующем запросом
 					time.Sleep(1000 * 2 * time.Millisecond)
 				})
@@ -153,10 +148,11 @@ $(“ul li:first”) – получить только первый элемен
 //}
 
 // получить параметры по каждому интсрументу
-func getAssetParams(href,title string) {
+func getAssetParams(href,title,dir string) {
 
 	fmt.Println(" ::href:",href)
 	fmt.Println(" ::title:",title)
+	fmt.Println(" ::dir:",dir)
 
 	counter++
 	fmt.Println(" ::count:",counter)
@@ -192,16 +188,20 @@ func getAssetParams(href,title string) {
 			formClass,_ := form.Find("form").Attr("class")
 			fmt.Println("form id:",formId)
 			fmt.Println("form class:",formClass)
+			// значения параметров запроса из полей формы ввода
 			form.Find("form#"+formId+"."+formClass+" input").Each(func (i int, input *goquery.Selection) {
 				inputId,_ := input.Attr("id")
-				fmt.Println(" input id:",inputId)
+				//fmt.Println(" input id:",inputId)
 				inputName,_ := form.Find("#"+inputId).Attr("name")
-				fmt.Println(" input name:", inputName)
+				//fmt.Println(" input name:", inputName)
 				inputValue,_ := form.Find("#"+inputId).Attr("value")
-				fmt.Println(" input value:", inputValue)
+				//fmt.Println(" input value:", inputValue)
 				// записать параметр
 				params[inputName] = inputValue
 			})
+
+			// парамтеры выпадающих списков
+			/*
 			form.Find("form#"+formId+"."+formClass+" select").Each(func (i int, sel *goquery.Selection) {
 				selectId,_ := sel.Attr("id")
 				fmt.Println(" select:",selectId)
@@ -210,6 +210,9 @@ func getAssetParams(href,title string) {
 					fmt.Println(" select value:", value)
 				})
 			})
+			*/
+			// названия строк формы
+			/*
 			form.Find("form#"+formId+"."+formClass+" tbody tr").Each(func (i int, tr *goquery.Selection) {
 				trId,_ := tr.Attr("id")
 				// костыль, в выводе есть пустой тэг tr, это условие его фильтрует
@@ -219,6 +222,7 @@ func getAssetParams(href,title string) {
 					fmt.Println(" tr text:",DecodeWindows1251([]byte(text)))
 				}
 			})
+			*/
 		})
 
 		// задать натройки по умолчанию либо жёстко заданные
@@ -230,7 +234,7 @@ func getAssetParams(href,title string) {
 		//параметры времени.
 		params["df"] = "1"
 		params["mf"] = "1"
-		params["yf"] = "2018"
+		params["yf"] = "2009"//"2018"
 		params["from"] = strings.Join([]string{params["df"],params["mf"],params["yf"]},".")//"01.01.2018"
 		//params["dt"] = "17"
 		//params["mt"] = "4"
@@ -256,6 +260,8 @@ func getAssetParams(href,title string) {
 		params["datf"] = "1"
 		//добавлять заголовок в файл
 		params["at"] = "1"
+		// каталог для расположения файла котировок
+		params["dir"] = dir
 
 		// загрузить истоирю инструмента с указанными параметрами	
 		downloadAssetHistory(params)
@@ -362,6 +368,11 @@ datf — Перечень получаемых данных (FIXME: венрно
 at — добавлять заголовок в файл (
 		0 — нет, 
 		1 — да)
+FIXME: надо проверить!
+fsp — Заполнять периоды без сделок(
+		0 — нет, 
+		1 — да)
+
 */
 func downloadAssetHistory(params map[string]string) {
 
@@ -377,7 +388,7 @@ func downloadAssetHistory(params map[string]string) {
 	code := params["code"]//"LKOH"
 	// неизветный
 	apply := params["apply"]//"0"
-	//параметры времени.
+	// параметры времени.
 	df := params["df"]//"1"
 	mf := params["mf"]//"1"
 	yf := params["yf"]//"2018"
@@ -386,26 +397,28 @@ func downloadAssetHistory(params map[string]string) {
 	mt := params["mt"]//"4"
 	yt := params["yt"]//"2019"
 	to := params["to"]//"17.04.2019"
-	//период котировок
+	// период котировок
 	p := params["p"]//"8" // дни
-	//расширение получаемого файла
+	// расширение получаемого файла
 	e := params["e"]//".csv"
-	//формат даты
+	// формат даты
 	dtf := params["dtf"]//"1"
-	//формат времени
+	// формат времени
 	tmf :=params["tmf"]//"1"
-	//выдавать время
+	// выдавать время
 	MSOR := params["MSOR"]//"0"
 	mstimever := params["mstimever"]//"1"
 	mstime := params["mstime"]//"on"
-	//параметр разделитель полей
+	// параметр разделитель полей
 	sep := params["sep"]//"3"
-	//параметр разделитель разрядов
+	// параметр разделитель разрядов
 	sep2 := params["sep2"]//"2"
-	//Перечень получаемых данных
+	// Перечень получаемых данных
 	datf := params["datf"]//"1"
-	//добавлять заголовок в файл
+	// добавлять заголовок в файл
 	at := params["at"]//"1"
+	// Заполнять периоды без сделок
+	fsp := params["fsp"]//"1"
 	// наименование выходного файла
 	// https://golang.org/pkg/regexp/#pkg-examples
 	re := regexp.MustCompile(`(?P<day>[0-9]+)[.](?P<month>[0-9]+)[.][0-9]{2,2}(?P<year>[0-9]{2,2})`)
@@ -424,7 +437,7 @@ func downloadAssetHistory(params map[string]string) {
 
 	//TODO: можно собрать и из хэша, но надо аккуратно см.пробник mapEx(), там есть нюансы возможно порядок следования аргументов имеет значение
 	// запрос истории иснтрумента с указанными параметрами
-	req := "http://export.finam.ru/"+f+e+"?market="+market+"&em="+em+"&code="+code+"&apply="+apply+"&df="+df+"&mf="+mf+"&yf="+yf+"&from="+from+"&dt="+dt+"&mt="+mt+"&yt="+yt+"&to="+to+"&p="+p+"&f="+f+"&e="+e+"&cn="+code+"&dtf="+dtf+"&tmf="+tmf+"&SOR="+MSOR+"&mstime="+mstime+"&mstimever="+mstimever+"&sep="+sep+"&sep2="+sep2+"&datf="+datf+"&at="+at
+	req := "http://export.finam.ru/"+f+e+"?market="+market+"&em="+em+"&code="+code+"&apply="+apply+"&df="+df+"&mf="+mf+"&yf="+yf+"&from="+from+"&dt="+dt+"&mt="+mt+"&yt="+yt+"&to="+to+"&p="+p+"&f="+f+"&e="+e+"&cn="+code+"&dtf="+dtf+"&tmf="+tmf+"&SOR="+MSOR+"&mstime="+mstime+"&mstimever="+mstimever+"&sep="+sep+"&sep2="+sep2+"&datf="+datf+"&at="+at+"&fsp="+fsp
 	fmt.Println("request:",req)
 
 
@@ -441,6 +454,14 @@ func downloadAssetHistory(params map[string]string) {
 		fmt.Println("GET:")
 		//fmt.Println(keepLines(string(body)))
 		fmt.Println(string(body))
+		// создать файл для размещения котировок актива
+		assetFname := filepath.Join(params["dir"],f+e)
+		asset,err := os.Create(assetFname)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer asset.Close()
+		asset.WriteString(string(body))
 	}
 
 }
@@ -459,81 +480,6 @@ TODO: для каждого рынка[Акции,Облигации?]
 		-сформировать запрос для загрузки данных и загрузить данные истории
 */
 
-func downloadEx() {
-
-	// общие параметры
-	market := "1"
-	em := "8"
-	code := "LKOH"
-	// неизветный
-	apply := "0"
-	//параметры времени.
-	df := "1"
-	mf := "1"
-	yf := "2018"
-	from := "01.01.2018"
-	dt := "17"
-	mt := "4"
-	yt := "2019"
-	to := "17.04.2019"
-	//период котировок
-	p := "8" // дни
-	//расширение получаемого файла
-	e := ".csv"
-	//формат даты
-	dtf := "1"
-	//формат времени
-	tmf :="1"
-	//выдавать время
-	MSOR := "0"
-	mstimever := "1"
-	mstime := "on"
-	//параметр разделитель полей
-	sep := "3"
-	//параметр разделитель разрядов
-	sep2 := "2"
-	//Перечень получаемых данных
-	datf := "1"
-	//добавлять заголовок в файл
-	at := "1"
-	// наименование выходного файла
-	// https://golang.org/pkg/regexp/#pkg-examples
-	re := regexp.MustCompile(`(?P<day>[0-9]+)[.](?P<month>[0-9]+)[.][0-9]{2,2}(?P<year>[0-9]{2,2})`)
-	fromPart := fmt.Sprintf("${%s}${%s}${%s}", re.SubexpNames()[3], re.SubexpNames()[2], re.SubexpNames()[1])
-	toPart := fmt.Sprintf("${%s}${%s}${%s}", re.SubexpNames()[3], re.SubexpNames()[2], re.SubexpNames()[1])
-	fromName := re.ReplaceAllString(from, fromPart)
-	toName := re.ReplaceAllString(to, toPart)
-	f := code + "_" + fromName + "_" + toName
-	//fmt.Println("from:",re.MatchString(from))
-	//fmt.Println("to:",re.MatchString(to))
-	//fmt.Println("fromPart:",re.MatchString(from))
-	//fmt.Println("toPart:",re.MatchString(to))
-	//fmt.Println("fromName:",fromName)
-	//fmt.Println("toName:",toName)
-
-	// http://export.finam.ru/POLY_170620_170623.txt?market=1&em=175924&code=POLY&apply=0&df=20&mf=5&yf=2017&from=20.06.2017&dt=23&mt=5&yt=2017&to=23.06.2017&p=8&f=POLY_170620_170623&e=.txt&cn=POLY&dtf=1&tmf=1&SOR=1&mstime=on&mstimever=1&sep=1&sep2=1&datf=1&at=1
-
-	// запрос истории иснтрумента с указанными параметрами
-	req := "http://export.finam.ru/"+f+e+"?market="+market+"&em="+em+"&code="+code+"&apply="+apply+"&df="+df+"&mf="+mf+"&yf="+yf+"&from="+from+"&dt="+dt+"&mt="+mt+"&yt="+yt+"&to="+to+"&p="+p+"&f="+f+"&e="+e+"&cn="+code+"&dtf="+dtf+"&tmf="+tmf+"&SOR="+MSOR+"&mstime="+mstime+"&mstimever="+mstimever+"&sep="+sep+"&sep2="+sep2+"&datf="+datf+"&at="+at
-	fmt.Println("request:",req)
-
-
-	// Request the HTML page.
-	res, err := http.Get(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-	} else {
-		body,_ := ioutil.ReadAll(res.Body)
-		fmt.Println("GET:")
-		//fmt.Println(keepLines(string(body)))
-		fmt.Println(string(body))
-	}
-
-}
 
 func dirEx() {
 	// fetching pwd
@@ -558,6 +504,7 @@ func dirEx() {
 	fmt.Println("dir:",dirPath)
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		fmt.Println("directory \""+dirPath+"\" does not exist")
+		fmt.Println("Creating \""+dirPath+"\"...")
 		//ModePerm FileMode = 0777 // Unix permission bits
 		perm := 0777
 		os.Mkdir(dirPath, os.FileMode(perm))
@@ -586,6 +533,58 @@ func dirEx() {
 		fmt.Printf("error walking the path %q: %v\n", tmpDir, err)
 		return
 	}
+
+}
+
+
+func prepare() string {
+	// fetching pwd
+	workdir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("working dir is:",workdir)
+	dirName := "stocks"
+	dirPath := filepath.Join(workdir,dirName)
+	fmt.Println("dir:",dirPath)
+	//TODO: remove all or what to do with existing directory?
+	// if data directory is not exists then create it at once
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		fmt.Println("directory \""+dirPath+"\" does not exist")
+		fmt.Println("Creating \""+dirPath+"\"...")
+		//ModePerm FileMode = 0777 // Unix permission bits
+		var perm os.FileMode = 0777
+		os.Mkdir(dirPath, perm)
+	}
+	return dirPath
+}
+
+
+//
+// main driver
+//
+func main() {
+
+	markets := []string{
+		"https://www.finam.ru/quotes/stocks/russia/", //- Акции российкий фондовый рынок
+		"https://www.finam.ru/quotes/indices/", // - Индексы
+		"https://www.finam.ru/quotes/bonds/", // - Облигации
+	}
+
+	for _,m := range markets {
+		fmt.Println("market:",m)
+		list := strings.Split(m,"/")
+		fmt.Println("list:",list[len(list)-3:])
+	}
+	dataDir := prepare()
+	getAssetsList(dataDir)
+
+	//getAssetParams()
+	//downloadAssetHistory()
+
+	//downloadEx()
+	//dirEx()
+	//mapEx()
 
 }
 
@@ -666,143 +665,79 @@ func mapEx() {
 	}
 }
 
-//
-// main driver
-//
-func main() {
+func downloadEx() {
 
-	markets := []string{
-		"https://www.finam.ru/quotes/stocks/russia/", //- Акции российкий фондовый рынок
-		"https://www.finam.ru/quotes/indices/", // - Индексы
-		"https://www.finam.ru/quotes/bonds/", // - Облигации
-	}
+	// общие параметры
+	market := "1"
+	em := "8"
+	code := "LKOH"
+	// неизветный
+	apply := "0"
+	//параметры времени.
+	df := "1"
+	mf := "1"
+	yf := "2018"
+	from := "01.01.2018"
+	dt := "17"
+	mt := "4"
+	yt := "2019"
+	to := "17.04.2019"
+	//период котировок
+	p := "8" // дни
+	//расширение получаемого файла
+	e := ".csv"
+	//формат даты
+	dtf := "1"
+	//формат времени
+	tmf :="1"
+	//выдавать время
+	MSOR := "0"
+	mstimever := "1"
+	mstime := "on"
+	//параметр разделитель полей
+	sep := "3"
+	//параметр разделитель разрядов
+	sep2 := "2"
+	//Перечень получаемых данных
+	datf := "1"
+	//добавлять заголовок в файл
+	at := "1"
+	// наименование выходного файла
+	// https://golang.org/pkg/regexp/#pkg-examples
+	re := regexp.MustCompile(`(?P<day>[0-9]+)[.](?P<month>[0-9]+)[.][0-9]{2,2}(?P<year>[0-9]{2,2})`)
+	fromPart := fmt.Sprintf("${%s}${%s}${%s}", re.SubexpNames()[3], re.SubexpNames()[2], re.SubexpNames()[1])
+	toPart := fmt.Sprintf("${%s}${%s}${%s}", re.SubexpNames()[3], re.SubexpNames()[2], re.SubexpNames()[1])
+	fromName := re.ReplaceAllString(from, fromPart)
+	toName := re.ReplaceAllString(to, toPart)
+	f := code + "_" + fromName + "_" + toName
+	//fmt.Println("from:",re.MatchString(from))
+	//fmt.Println("to:",re.MatchString(to))
+	//fmt.Println("fromPart:",re.MatchString(from))
+	//fmt.Println("toPart:",re.MatchString(to))
+	//fmt.Println("fromName:",fromName)
+	//fmt.Println("toName:",toName)
 
-	for _,m := range markets {
-		fmt.Println("market:",m)
-		list := strings.Split(m,"/")
-		fmt.Println("list:",list[len(list)-3:])
-	}
-	//getAssetsList()
+	// http://export.finam.ru/POLY_170620_170623.txt?market=1&em=175924&code=POLY&apply=0&df=20&mf=5&yf=2017&from=20.06.2017&dt=23&mt=5&yt=2017&to=23.06.2017&p=8&f=POLY_170620_170623&e=.txt&cn=POLY&dtf=1&tmf=1&SOR=1&mstime=on&mstimever=1&sep=1&sep2=1&datf=1&at=1
 
-	//getAssetParams()
-	//downloadAssetHistory()
-
-	//downloadEx()
-	dirEx()
-	//mapEx()
-
-}
+	// запрос истории иснтрумента с указанными параметрами
+	req := "http://export.finam.ru/"+f+e+"?market="+market+"&em="+em+"&code="+code+"&apply="+apply+"&df="+df+"&mf="+mf+"&yf="+yf+"&from="+from+"&dt="+dt+"&mt="+mt+"&yt="+yt+"&to="+to+"&p="+p+"&f="+f+"&e="+e+"&cn="+code+"&dtf="+dtf+"&tmf="+tmf+"&SOR="+MSOR+"&mstime="+mstime+"&mstimever="+mstimever+"&sep="+sep+"&sep2="+sep2+"&datf="+datf+"&at="+at
+	fmt.Println("request:",req)
 
 
-
-
-/*
-	// Go contains rich function for grab web contents. net/http is the major library
-	// https://dlintw.github.io/gobyexample/public/http-client.html
-
-	// GET request
-	resp, err := http.Get("https://dlintw.github.io/gobyexample/public/http-client.html")
+	// Request the HTML page.
+	res, err := http.Get(req)
 	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	fmt.Println("get:\n", keepLines(string(body), 3))
-
-	//We can use POST form to get result, too.
-	resp, err = http.PostForm("http://duckduckgo.com",
-		url.Values{"q": {"github"}})
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	body, err = ioutil.ReadAll(resp.Body)
-	fmt.Println("post:\n", keepLines(string(body), 3))
-*/
-/*
-//remove
-func GetAssetHistory() {
-
-	CSSPath := "html body.i-user_logged_no.i-user_client_no div.finam-wrap div.finam-global-container div.content div.layout table.main tbody tr td#content-block.inside-container.content div#issuer-profile div#issuer-profile-container div#issuer-profile-outer div#issuer-profile-inner div#issuer-profile-content div#issuer-profile-export div#issuer-profile-export-form"
-
-
-	//We can use POST form to get result, too.
-	res, err := http.PostForm("https://www.finam.ru/profile/moex-akcii/lukoil/export",
-		nil)//url.Values{"pageNumber": {page}})
-	if err != nil {
-		//panic(err)
 		log.Fatal(err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
 		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
 	} else {
-		// Load the HTML document
-		doc, err := goquery.NewDocumentFromReader(res.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// Find the table items
-		doc.Find(CSSPath).Each(func (i int, s *goquery.Selection) {
-			// For each item found
-			id,_ := s.Find(CSSPath + " form").Attr("id")
-			class,_ := s.Find(CSSPath + " form").Attr("class")
-			name,_ := s.Find(CSSPath + " form").Attr("name")
-			action,_ := s.Find(CSSPath + " form").Attr("action")
-			method,_ := s.Find(CSSPath + " form").Attr("method")
-			fmt.Println("id:",id)
-			fmt.Println("class:",class)
-			fmt.Println("name:",name)
-			fmt.Println("action:",action)
-			fmt.Println("method:",method)
-
-			s.Find(CSSPath + " form input").Each(func (i int, s1 *goquery.Selection) {
-				id,_ := s1.Attr("id")
-				//typ,_ := s1.Attr("type")
-				name,_ := s1.Attr("name")
-				value,_ := s1.Attr("value")
-				fmt.Println(" *****")
-				fmt.Println(" id:",id)
-				//fmt.Println(" type:",typ)
-				fmt.Println(" name:",name)
-				fmt.Println(" value:",value)
-			})
-
-			s.Find(CSSPath + "form table").Each(func (i int, s1 *goquery.Selection) {
-				f := s1.Find("tr").Text()
-				fmt.Println("f:",f)
-
-			})
-		})
+		body,_ := ioutil.ReadAll(res.Body)
+		fmt.Println("GET:")
+		//fmt.Println(keepLines(string(body)))
+		fmt.Println(string(body))
 	}
-}
-*/
-//
-// пример использования библиотеки goquery
-//
-func ExampleScrape() {
-  // Request the HTML page.
-  res, err := http.Get("http://metalsucks.net")
-  if err != nil {
-    log.Fatal(err)
-  }
-  defer res.Body.Close()
-  if res.StatusCode != 200 {
-    log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-  }
 
-  // Load the HTML document
-  doc, err := goquery.NewDocumentFromReader(res.Body)
-  if err != nil {
-    log.Fatal(err)
-  }
-
-  // Find the review items
-  doc.Find(".sidebar-reviews article .content-block").Each(func(i int, s *goquery.Selection) {
-    // For each item found, get the band and title
-    band := s.Find("a").Text()
-    title := s.Find("i").Text()
-    fmt.Printf("Review %d: %s - %s\n", i, band, title)
-  })
 }
+
