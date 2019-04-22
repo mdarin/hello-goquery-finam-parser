@@ -549,8 +549,46 @@ func dirEx() {
 	}
 
 	fmt.Println("args[0]:",os.Args[0])
-	fmt.Println("base:",filepath.Dir(os.Args[0]))
+	fmt.Println("dir:",filepath.Dir(os.Args[0]))
+	fmt.Println("base:",filepath.Base(os.Args[0]))
+
+
+	dirName := "stocks"
+	dirPath := filepath.Join(workdir,dirName)
+	fmt.Println("dir:",dirPath)
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		fmt.Println("directory \""+dirPath+"\" does not exist")
+		//ModePerm FileMode = 0777 // Unix permission bits
+		perm := 0777
+		os.Mkdir(dirPath, os.FileMode(perm))
+	}
+
+	//os.RemoveAll(dirPath) // удаляет вместе с корневым каталогом
+
+	// обход от указанного корня
+	// https://golang.org/pkg/path/filepath/#Walk
+	//subDirToSkip := "skip"
+	tmpDir := "dir/to/walk/skip"
+	err = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
+			return err
+		}
+		if info.IsDir() { // && info.Name() == subDirToSkip {
+			//fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
+			fmt.Printf("Is a dir: %+v \n", info.Name())
+			//return filepath.SkipDir
+		}
+		fmt.Printf("visited file or dir: %q\n", path)
+		return nil
+	})
+	if err != nil {
+		fmt.Printf("error walking the path %q: %v\n", tmpDir, err)
+		return
+	}
+
 }
+
 
 func mapEx() {
 	params := make(map[string]string)
