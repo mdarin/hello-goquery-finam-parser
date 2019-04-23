@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"io/ioutil"
 	"strings"
+	"bufio" // to scan and tokenize buffered input data from an io.Reader source
 	"regexp"
 	"os" // for operations with dirs
 	"time" // for sleep
@@ -73,7 +74,6 @@ func keepLines(s string, n int) string {
 }
 
 
-//TODO: inprove
 func getAssetsList(dir string) {
 	stop := false
 	for i := 1; i < 100 && !stop; i++ {
@@ -478,6 +478,7 @@ TODO: для каждого рынка[Акции,Облигации?]
 		-получить страницу для загрузки данных истории
 		-на странице загрузки итории получить параметры требуемы для загрузки
 		-сформировать запрос для загрузки данных и загрузить данные истории
+	сформировать сводную таблицу катировок всех активов по ценам закрытия соотнесённых по времени(дате)
 */
 
 
@@ -559,7 +560,49 @@ func prepare() string {
 	return dirPath
 }
 
+func transform(rootDir string) {
+	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
+			return err
+		}
 
+		if info.IsDir() {
+			//fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
+			fmt.Printf("Is a dir: %+v %q\n", info.Name(), path)
+			//return filepath.SkipDir
+		} else {
+			fmt.Println()
+			fmt.Printf("visited file: %q\n", path)
+			// выбрать из файла котировок(quotations) данные тикер, дата, цена закрытия 
+			// и поместить их в буфер для последующего формирвоания сводной таблицы
+			file, err := os.Open(path)
+			if err != nil {
+				fmt.Println("Unable to open file:", path, err)
+				return err
+			}
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			scanner.Split(bufio.ScanLines)
+			for scanner.Scan() {
+				// field[0],field[2],field[7]
+				fields := strings.Split(scanner.Text(), ";")
+				//TODO: преобразовать
+				//fmt.Println("*",fields)
+				fmt.Printf("tiker: %s date: %q  price: %q\n",fields[0],fields[2],fields[7])
+			}
+		} // eof if-else
+
+		return nil
+	})
+
+	if err != nil {
+		//fmt.Printf("error walking the path %q: %v\n", tmpDir, err)
+		fmt.Println("transform error:",err)
+		return
+	}
+}
 //
 // main driver
 //
@@ -577,7 +620,8 @@ func main() {
 		fmt.Println("list:",list[len(list)-3:])
 	}
 	dataDir := prepare()
-	getAssetsList(dataDir)
+	//getAssetsList(dataDir)
+	transform(dataDir)
 
 	//getAssetParams()
 	//downloadAssetHistory()
