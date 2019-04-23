@@ -15,7 +15,9 @@ import (
 	"io/ioutil"
 	"strings"
 	"bufio" // to scan and tokenize buffered input data from an io.Reader source
+	"strconv"
 	"regexp"
+	"errors" // for errors.New()
 	"os" // for operations with dirs
 	"time" // for sleep
 	//NOTE: The path package should only be used for paths separated by forward slashes, 
@@ -586,11 +588,13 @@ func transform(rootDir string) {
 			scanner := bufio.NewScanner(file)
 			scanner.Split(bufio.ScanLines)
 			for scanner.Scan() {
-				// field[0],field[2],field[7]
+				// получить поля
+				// tiker:field[0],date:field[2],close:field[7]
 				fields := strings.Split(scanner.Text(), ";")
-				//TODO: преобразовать
 				//fmt.Println("*",fields)
-				fmt.Printf("tiker: %s date: %q  price: %q\n",fields[0],fields[2],fields[7])
+				// преобразовать в float64
+				floatNum,_ := toFloat64(fields[7])
+				fmt.Printf("tiker: %s date: %q  price: %q[%.4f]\n",fields[0],fields[2],fields[7],floatNum)
 			}
 		} // eof if-else
 
@@ -603,6 +607,41 @@ func transform(rootDir string) {
 		return
 	}
 }
+
+
+// convert finam quotations' prices value to Golang float64
+func toFloat64(s string) (float64,error) {
+	re := regexp.MustCompile(`^(?P<integer>.+?)[.](?P<fractional>[0-9]+)$`)
+	//fmt.Println("string:",s)
+	if re.MatchString(s) {
+		//fmt.Println("string:",s)
+		// split fractional part by colon ':'
+		temp := re.ReplaceAllString(s,"${integer}:${fractional}")
+		//fmt.Println(temp)
+		// remove all dots '.'
+		re = regexp.MustCompile(`[.]`)
+		temp = re.ReplaceAllString(temp,"")
+		//fmt.Println(temp)
+		// replace colon by dot (to well formed float)
+		re = regexp.MustCompile(`[:]`)
+		temp = re.ReplaceAllString(temp,".")
+		//fmt.Println(temp)
+		// convert to float64
+		floatNum, err := strconv.ParseFloat(temp, 64)
+		if err != nil {
+			return 0.0,err
+			//fmt.Println("error:",err)
+		}
+		//fmt.Printf("float: %f\n", floatNum)
+		return floatNum,nil
+	} else {
+		//fmt.Println("not match",s)
+		return 0.0,errors.New("not match")
+	}
+
+
+}
+
 //
 // main driver
 //
@@ -623,6 +662,8 @@ func main() {
 	//getAssetsList(dataDir)
 	transform(dataDir)
 
+	//toFloatEx()
+
 	//getAssetParams()
 	//downloadAssetHistory()
 
@@ -632,6 +673,84 @@ func main() {
 
 }
 
+
+func toFloatEx() {
+	str := []string{
+		"0.2250000",
+		"0.2220000",
+		"0.2200000",
+		"0.2120000",
+		"0.2150000",
+		"0.2240000",
+		"0.2200000",
+		"0.2200000",
+		"0.2210000",
+		"714.0000000",
+		"701.0000000",
+		"682.0000000",
+		"750.0000000",
+		"700.0000000",
+		"722.0000000",
+		"680.0000000",
+		"717.0000000",
+		"749.0000000",
+		"903.0000000",
+		"894.0000000",
+		"1.088.0000000",
+		"1.040.0000000",
+		"1.074.0000000",
+		"1.051.0000000",
+		"1.132.0000000",
+		"1.186.0000000",
+		"1.129.0000000",
+		"1.102.0000000",
+		"1.099.0000000",
+		"1.078.0000000",
+		"1.089.0000000",
+		"1.035.0000000",
+		"1.034.0000000",
+		"1.032.0000000",
+		"990.0000000",
+		"1.002.0000000",
+		"1.005.0000000",
+		"a;dsf",
+	}
+
+	/*
+	from := "01.01.2019"
+	re := regexp.MustCompile(`(?P<integer>[0-9]+)[.](?P<fractional>[0-9]+)`)
+	fromPart := fmt.Sprintf("${%s}${%s}", re.SubexpNames()[1], re.SubexpNames()[2])
+	fromName := re.ReplaceAllString(from, fromPart)
+
+	fmt.Println("from:",re.MatchString(from))
+	fmt.Println("fromPart:",re.MatchString(from))
+	fmt.Println("fromName:",fromName)
+	*/
+
+	// integer and fractional part of the malformed float price value
+	for	_,s := range str {
+		fmt.Println("string:",s)
+		re := regexp.MustCompile(`^(?P<integer>.+?)[.](?P<fractional>[0-9]+)$`)
+		// split fractional part by colon ':'
+		temp := re.ReplaceAllString(s,"${integer}:${fractional}")
+		fmt.Println(temp)
+		// remove all dots '.'
+		re = regexp.MustCompile(`[.]`)
+		temp = re.ReplaceAllString(temp,"")
+		fmt.Println(temp)
+		// replace colon by dot (to well formed float)
+		re = regexp.MustCompile(`[:]`)
+		temp = re.ReplaceAllString(temp,".")
+		fmt.Println(temp)
+		// convert to float64
+		floatNum, err := strconv.ParseFloat(temp, 64)
+		if err != nil {
+			//return 0.0,nil
+			fmt.Println("error:",err)
+		}
+		fmt.Printf("float: %f\n", floatNum)
+	}
+}
 
 func mapEx() {
 	params := make(map[string]string)
