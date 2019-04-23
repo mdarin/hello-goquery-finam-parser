@@ -75,7 +75,7 @@ func keepLines(s string, n int) string {
 	return strings.Replace(result, "\r", "", -1)
 }
 
-
+// получить ссылки и наименования активов(здесь акций РФР)
 func getAssetsList(dir string) {
 	stop := false
 	for i := 1; i < 100 && !stop; i++ {
@@ -484,62 +484,8 @@ TODO: для каждого рынка[Акции,Облигации?]
 */
 
 
-func dirEx() {
-	// fetching pwd
-	workdir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("working dir is:",workdir)
-	// existance and filepath joining
-	filename := filepath.Join(workdir,"a-nonexistent-file.txt")
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		fmt.Println("file \""+filename+"\" does not exist")
-	}
 
-	fmt.Println("args[0]:",os.Args[0])
-	fmt.Println("dir:",filepath.Dir(os.Args[0]))
-	fmt.Println("base:",filepath.Base(os.Args[0]))
-
-
-	dirName := "stocks"
-	dirPath := filepath.Join(workdir,dirName)
-	fmt.Println("dir:",dirPath)
-	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
-		fmt.Println("directory \""+dirPath+"\" does not exist")
-		fmt.Println("Creating \""+dirPath+"\"...")
-		//ModePerm FileMode = 0777 // Unix permission bits
-		perm := 0777
-		os.Mkdir(dirPath, os.FileMode(perm))
-	}
-
-	//os.RemoveAll(dirPath) // удаляет вместе с корневым каталогом
-
-	// обход от указанного корня
-	// https://golang.org/pkg/path/filepath/#Walk
-	//subDirToSkip := "skip"
-	tmpDir := "dir/to/walk/skip"
-	err = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
-			return err
-		}
-		if info.IsDir() { // && info.Name() == subDirToSkip {
-			//fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
-			fmt.Printf("Is a dir: %+v \n", info.Name())
-			//return filepath.SkipDir
-		}
-		fmt.Printf("visited file or dir: %q\n", path)
-		return nil
-	})
-	if err != nil {
-		fmt.Printf("error walking the path %q: %v\n", tmpDir, err)
-		return
-	}
-
-}
-
-
+// подготовить структуру каталогов для размещения скачиваемых котировок
 func prepare() string {
 	// fetching pwd
 	workdir, err := os.Getwd()
@@ -562,6 +508,8 @@ func prepare() string {
 	return dirPath
 }
 
+// привести скачанные данные к виду пригодному для загрузки в решающее устройство
+// здесь надо сформировать на выходе сводную таблицу активов(Assets), в которой все пробелы дополнены нулями
 func transform(rootDir string) {
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -596,6 +544,7 @@ func transform(rootDir string) {
 				floatNum,_ := toFloat64(fields[7])
 				fmt.Printf("tiker: %s date: %q  price: %q[%.4f]\n",fields[0],fields[2],fields[7],floatNum)
 			}
+			//TODO: сформировать сводную таблицу котировок
 		} // eof if-else
 
 		return nil
@@ -672,6 +621,11 @@ func main() {
 	//mapEx()
 
 }
+
+
+//
+// пробники
+//
 
 
 func toFloatEx() {
@@ -904,3 +858,58 @@ func downloadEx() {
 
 }
 
+
+func dirEx() {
+	// fetching pwd
+	workdir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("working dir is:",workdir)
+	// existance and filepath joining
+	filename := filepath.Join(workdir,"a-nonexistent-file.txt")
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		fmt.Println("file \""+filename+"\" does not exist")
+	}
+
+	fmt.Println("args[0]:",os.Args[0])
+	fmt.Println("dir:",filepath.Dir(os.Args[0]))
+	fmt.Println("base:",filepath.Base(os.Args[0]))
+
+
+	dirName := "stocks"
+	dirPath := filepath.Join(workdir,dirName)
+	fmt.Println("dir:",dirPath)
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		fmt.Println("directory \""+dirPath+"\" does not exist")
+		fmt.Println("Creating \""+dirPath+"\"...")
+		//ModePerm FileMode = 0777 // Unix permission bits
+		perm := 0777
+		os.Mkdir(dirPath, os.FileMode(perm))
+	}
+
+	//os.RemoveAll(dirPath) // удаляет вместе с корневым каталогом
+
+	// обход от указанного корня
+	// https://golang.org/pkg/path/filepath/#Walk
+	//subDirToSkip := "skip"
+	tmpDir := "dir/to/walk/skip"
+	err = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
+			return err
+		}
+		if info.IsDir() { // && info.Name() == subDirToSkip {
+			//fmt.Printf("skipping a dir without errors: %+v \n", info.Name())
+			fmt.Printf("Is a dir: %+v \n", info.Name())
+			//return filepath.SkipDir
+		}
+		fmt.Printf("visited file or dir: %q\n", path)
+		return nil
+	})
+	if err != nil {
+		fmt.Printf("error walking the path %q: %v\n", tmpDir, err)
+		return
+	}
+
+}
