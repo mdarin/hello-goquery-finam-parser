@@ -499,8 +499,24 @@ func prepare() string {
 
 
 // ----------------
-type SummaryTable map[string][]string
-
+type SummaryTableRecord struct{
+	//ticker string // тикер акции
+	date string // дата фиксации цены
+	price float64 // цена закрытия
+}
+// constructor
+func NewSTR(date string, price float64) (*SummaryTableRecord,error) {
+	rec := new(SummaryTableRecord)
+	rec.date = date
+	rec.price = price
+	return rec,nil
+}
+type SummaryTable map[string][]*SummaryTableRecord //string
+// интерфейс
+func (s *SummaryTable) Add(ticker,date string, price float64) {
+	rec,_ := NewSTR(date, price)
+	(*s)[ticker] = append((*s)[ticker], rec)
+}
 
 type TickersAndLens struct {
 	length int
@@ -562,10 +578,11 @@ func transform(rootDir string) {
 				// дата
 				date := fields[2]
 				// преобразовать в float64
-				//floatNum,_ = toFloat64(fields[7])
+				price,_ := toFloat64(fields[7])
 				//fmt.Printf("tiker: %s date: %q  price: %q[%.4f]\n",fields[0],fields[2],fields[7],floatNum)
 				// https://stackoverflow.com/questions/12677934/create-a-golang-map-of-lists
-				summaryTable[ticker] = append(summaryTable[ticker],date)
+				//summaryTable[ticker] = append(summaryTable[ticker],date)
+				summaryTable.Add(ticker,date,price)
 			}
 		} // eof if-else
 
@@ -588,10 +605,10 @@ func transform(rootDir string) {
 	sort.Sort(byLen)
 
 	// отобразить полученные результат
-	for i := 0; i < len(byLen); i++ {
+	//for i := 0; i < len(byLen); i++ {
 		//fmt.Printf("ticker: %s  len:%d   sumlen:%d\n",byLen[i].ticker,byLen[i].length,byLen.Len())
-		fmt.Printf("[%d]: ticker: %s  len:%d\n",i,byLen[i].ticker,byLen[i].length)
-	}
+	//	fmt.Printf("[%d]: ticker: %s  len:%d\n",i,byLen[i].ticker,byLen[i].length)
+	//}
 
 	longestTicker := byLen[0].ticker
 	longetsLen := byLen[0].length
@@ -599,10 +616,22 @@ func transform(rootDir string) {
 	// показать наиболее длинную иторию
 	fmt.Printf("MAX ticker: %s  len:%d\n",longestTicker,longetsLen)
 
+
+	//TODO: выровнять размеры добиваня пропуски нулями для всех инструментов
+
+	// сформирвоать заголовок
+	// поле дата
+	fmt.Printf("DATE")
+	// получить значение тикера для каждого инструмента
+	for _,asset := range byLen {
+		fmt.Printf("%s%s",";",asset.ticker)
+	}
+	fmt.Println()
 	// для каждой строки выражающей дату(день) отобразить значение цены каждого инструмента на эту дату
 	for i := 0; i < byLen[0].length; i++ {
-		// получить дату текущую из истории наиболее длинной истории
-		date := summaryTable[longestTicker][i]
+
+		// получить дату текущую(дату итерации) из наиболее длинной истории
+		date := summaryTable[longestTicker][i].date
 
 		//TODO: вообще надо нормировку дат произвести чтобы вдруг пустых не было пропуски 
 		// все надо нулями забить в модельной истории перед использованием
@@ -611,12 +640,12 @@ func transform(rootDir string) {
 		sep := ""
 		fmt.Printf("%s%s",sep,date)
 		sep = ";"
-		// получить значение цены на дату для каждого интрумента
+		// получить значение цены на дату для каждого инструмента
 		for _,asset := range byLen {
 			fmt.Printf("%s%s",sep,asset.ticker)
-			//byLen[i].ticker = k
-			//byLen[i].length = len(v)
-			//i++
+			//TODO: тут надо соотносить по датам значеиния цены и забивать нулями всё пробелы и пропуски
+			//price := summaryTable[asset.ticker][i].price
+			//fmt.Printf("%s%f",sep,price)
 		}
 		fmt.Println()
 	}
