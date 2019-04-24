@@ -642,10 +642,13 @@ func transform(rootDir string) {
 		sep = ";"
 		// получить значение цены на дату для каждого инструмента
 		for _,asset := range byLen {
-			fmt.Printf("%s%s",sep,asset.ticker)
+			//fmt.Printf("%s%s",sep,asset.ticker)
 			//TODO: тут надо соотносить по датам значеиния цены и забивать нулями всё пробелы и пропуски
-			//price := summaryTable[asset.ticker][i].price
-			//fmt.Printf("%s%f",sep,price)
+			price := float64(0)
+			if i < len(summaryTable[asset.ticker]) {
+				price = summaryTable[asset.ticker][i].price
+			}
+			fmt.Printf("%s%f",sep,price)
 		}
 		fmt.Println()
 	}
@@ -709,7 +712,7 @@ TODO: для каждого рынка[Акции,Облигации?]
 // main driver
 //
 func main() {
-
+/*
 	markets := []string{
 		"https://www.finam.ru/quotes/stocks/russia/", //- Акции российкий фондовый рынок
 		"https://www.finam.ru/quotes/indices/", // - Индексы
@@ -724,6 +727,13 @@ func main() {
 	dataDir := prepare()
 	//getAssetsList(dataDir)
 	transform(dataDir)
+*/
+
+//
+// пробники
+//
+	strToDateEx()
+	//appNprepEx()
 
 	//toFloatEx()
 
@@ -740,6 +750,47 @@ func main() {
 //
 // пробники
 //
+
+
+// go parse date and time
+// тут шаблоны описаны вроде норм
+// http://demin.ws/blog/russian/2012/04/27/date-and-time-formatting-in-go/
+func strToDateEx() {
+	// преобразумеа строка содержащая дату
+	str := []string{
+		"20130806",
+		"20140212",
+		"20150402",
+		"20160216",
+		"20180306",
+		"20091201",
+	}
+	// эти волшебшые числа в шаблоне это пи*да, именно так должно быть!"
+	layout := "20060102" // формат разбираемой даты
+	// полуичить дату 
+	for _,s := range str {
+		date, err := time.Parse(layout,s)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("date:",date)
+	}
+}
+
+
+// Go – append/prepend item into slice
+func appNprepEx() {
+	// https://codingair.wordpress.com/2014/07/18/go-appendprepend-item-into-slice/
+	data := []string{"A", "B", "C", "D"}
+	// append "F"
+  data = append(data, "F")
+  fmt.Println("append:",data)
+  // [A B C D F]
+	// prepend "G"
+  data = append([]string{"G"},data...)
+  fmt.Println("prepend:",data)
+  // [G A B C D F]
+}
 
 
 func toFloatEx() {
