@@ -20,6 +20,7 @@ import (
 	"errors" // for errors.New()
 	"os" // for operations with dirs
 	"time" // for sleep
+	"sort" // for sorging
 	//NOTE: The path package should only be used for paths separated by forward slashes, 
 	//      such as the paths in URLs. This package does not deal with Windows paths with 
 	//      drive letters or backslashes; to manipulate operating system paths, use the path/filepath package.
@@ -75,6 +76,7 @@ func keepLines(s string, n int) string {
 	return strings.Replace(result, "\r", "", -1)
 }
 
+
 // получить ссылки и наименования активов(здесь акций РФР)
 func getAssetsList(dir string) {
 	stop := false
@@ -120,7 +122,7 @@ func getAssetsList(dir string) {
 					fmt.Println("page:["+page+"]")
 					fmt.Println("tr href:", href)
 					fmt.Println("tr title:", title)
-					// цифры
+					// цифры текущего состояния актива
 					//tr.Find("td").Each( func (i int, td *goquery.Selection) {
 					//	spanValue := td.Find("span").Text()
 					//	fmt.Println("span value:", spanValue)
@@ -469,20 +471,6 @@ func downloadAssetHistory(params map[string]string) {
 }
 
 
-/*
-Алгоритм
-
-надо будет разобраться со структурой чтобы по каталогам это всё аккуратно заложить
-
-
-TODO: для каждого рынка[Акции,Облигации?] 
-	для каждого иструмента 
-		-получить страницу для загрузки данных истории
-		-на странице загрузки итории получить параметры требуемы для загрузки
-		-сформировать запрос для загрузки данных и загрузить данные истории
-	сформировать сводную таблицу котировок всех активов по ценам закрытия соотнесённых по времени(дате)
-*/
-
 
 
 // подготовить структуру каталогов для размещения скачиваемых котировок
@@ -508,9 +496,37 @@ func prepare() string {
 	return dirPath
 }
 
+
+
+// ----------------
+type SummaryTable map[string][]string
+
+
+type TickersAndLens struct {
+	length int
+	ticker string
+}
+// This type implements sort.Interface for []TicketsAndLens based on that length values.
+type ByLen []TickersAndLens
+
+func (a ByLen) Len() int           { return len(a) }
+func (a ByLen) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+// asc
+//func (a ByLen) Less(i, j int) bool { return a[i].length < a[j].length }
+// decs
+func (a ByLen) Less(i, j int) bool { return a[i].length > a[j].length }
+
+// ------------------
+
+
 // привести скачанные данные к виду пригодному для загрузки в решающее устройство
 // здесь надо сформировать на выходе сводную таблицу активов(Assets), в которой все пробелы дополнены нулями
 func transform(rootDir string) {
+	// сводная таблица активов
+	// строка таблицы - это значения каждого актива на указанную дату либо 0 если значение на дату отсутствует
+	summaryTable := make(SummaryTable)
+
+	// сформировать сводную таблицу котировок
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
@@ -536,19 +552,75 @@ func transform(rootDir string) {
 			scanner := bufio.NewScanner(file)
 			scanner.Split(bufio.ScanLines)
 			for scanner.Scan() {
+				//TODO: пропускать заголовок :)
 				// получить поля
-				// tiker:field[0],date:field[2],close:field[7]
 				fields := strings.Split(scanner.Text(), ";")
 				//fmt.Println("*",fields)
+				// tiker:field[0],date:field[2],close:field[7]
+				// тикер актива
+				ticker := fields[0]
+				// дата
+				date := fields[2]
 				// преобразовать в float64
-				floatNum,_ := toFloat64(fields[7])
-				fmt.Printf("tiker: %s date: %q  price: %q[%.4f]\n",fields[0],fields[2],fields[7],floatNum)
+				//floatNum,_ = toFloat64(fields[7])
+				//fmt.Printf("tiker: %s date: %q  price: %q[%.4f]\n",fields[0],fields[2],fields[7],floatNum)
+				// https://stackoverflow.com/questions/12677934/create-a-golang-map-of-lists
+				summaryTable[ticker] = append(summaryTable[ticker],date)
 			}
-			//TODO: сформировать сводную таблицу котировок
 		} // eof if-else
 
 		return nil
 	})
+
+	// временный массив для сортировки
+	byLen := make(ByLen,len(summaryTable))
+
+	// сформировать вспомогательный массив для сортировке по длине истории, чтобы получить максимальную длину
+	i := 0
+	// map traversal
+	for k,v := range summaryTable {
+		//fmt.Printf("ticker: %s  len:%d sumlen:%d\n",k,len(v),len(summaryTable))
+		byLen[i].ticker = k
+		byLen[i].length = len(v)
+		i++
+	}
+	// получить наиболее длинную историю за одно отсортировать истории
+	sort.Sort(byLen)
+
+	// отобразить полученные результат
+	for i := 0; i < len(byLen); i++ {
+		//fmt.Printf("ticker: %s  len:%d   sumlen:%d\n",byLen[i].ticker,byLen[i].length,byLen.Len())
+		fmt.Printf("[%d]: ticker: %s  len:%d\n",i,byLen[i].ticker,byLen[i].length)
+	}
+
+	longestTicker := byLen[0].ticker
+	longetsLen := byLen[0].length
+
+	// показать наиболее длинную иторию
+	fmt.Printf("MAX ticker: %s  len:%d\n",longestTicker,longetsLen)
+
+	// для каждой строки выражающей дату(день) отобразить значение цены каждого инструмента на эту дату
+	for i := 0; i < byLen[0].length; i++ {
+		// получить дату текущую из истории наиболее длинной истории
+		date := summaryTable[longestTicker][i]
+
+		//TODO: вообще надо нормировку дат произвести чтобы вдруг пустых не было пропуски 
+		// все надо нулями забить в модельной истории перед использованием
+
+		// отображить дату
+		sep := ""
+		fmt.Printf("%s%s",sep,date)
+		sep = ";"
+		// получить значение цены на дату для каждого интрумента
+		for _,asset := range byLen {
+			fmt.Printf("%s%s",sep,asset.ticker)
+			//byLen[i].ticker = k
+			//byLen[i].length = len(v)
+			//i++
+		}
+		fmt.Println()
+	}
+
 
 	if err != nil {
 		//fmt.Printf("error walking the path %q: %v\n", tmpDir, err)
@@ -558,7 +630,7 @@ func transform(rootDir string) {
 }
 
 
-// convert finam quotations' prices value to Golang float64
+// convert Finam quotations' prices value to Golang float64
 func toFloat64(s string) (float64,error) {
 	re := regexp.MustCompile(`^(?P<integer>.+?)[.](?P<fractional>[0-9]+)$`)
 	//fmt.Println("string:",s)
@@ -587,9 +659,22 @@ func toFloat64(s string) (float64,error) {
 		//fmt.Println("not match",s)
 		return 0.0,errors.New("not match")
 	}
-
-
 }
+
+
+/*
+Алгоритм
+
+надо будет разобраться со структурой чтобы по каталогам это всё аккуратно заложить
+
+
+TODO: для каждого рынка[Акции,Облигации?] 
+	для каждого иструмента 
+		-получить страницу для загрузки данных истории
+		-на странице загрузки итории получить параметры требуемы для загрузки
+		-сформировать запрос для загрузки данных и загрузить данные истории
+	сформировать сводную таблицу котировок всех активов по ценам закрытия соотнесённых по времени(дате)
+*/
 
 //
 // main driver
