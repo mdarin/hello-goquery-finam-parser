@@ -2,6 +2,10 @@
 // загрузчик данных с сайта Финам
 // по мотивам статьи https://habr.com/ru/post/332700/
 //
+// Work like a slave; command like a king; create like a god.
+// Original in Romanian: 
+// Muncește ca un sclav, poruncește ca un rege, creează ca un zeu.
+// Constantin Brâncuși
 package main
 
 import (
@@ -873,6 +877,16 @@ func appNprepEx() {
   data = append([]string{"G"},data...)
   fmt.Println("prepend:",data)
   // [G A B C D F]
+
+
+	/*
+	тамже в коментах
+	A better prepend, as it generates less garbage:
+	
+	data = append(data, “”)
+	copy(data[1:], data)
+	data[0] = “Prepend Item”
+	*/
 }
 
 
