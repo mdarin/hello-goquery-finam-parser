@@ -560,7 +560,6 @@ func fillin(rootDir string, summaryTable *SummaryTable) error {
 			//return filepath.SkipDir
 		} else {
 			fmt.Println()
-			count++
 			fmt.Printf("visited file: %q  %d\n", path, count)
 			// выбрать из файла котировок(quotations) данные тикер, дата, цена закрытия 
 			// и поместить их в буфер для последующего формирвоания сводной таблицы
@@ -574,19 +573,28 @@ func fillin(rootDir string, summaryTable *SummaryTable) error {
 			fmt.Println("TIKER:",filepath.Base(path))
 			once := false
 
-			fmt.Println("Summary len before:",len( (*summaryTable) ))
+			// размер таблицы до изменений 
+			before := len( (*summaryTable) )
+
+			fmt.Println("Summary len before:",before)
 			scanner := bufio.NewScanner(file)
 			scanner.Split(bufio.ScanLines)
 			// skip head
+			// пропускать заголовок :)
 			scanner.Scan()
 			for scanner.Scan() {
-				//TODO: пропускать заголовок :)
+				//FIXME:DEBUG показать запись
+				//fmt.Println("$$ ",scanner.Text())
+
+				//FIXME:DEBUG показать запись
+				//fmt.Println("*",fields)
+
 				// получить поля
 				fields := strings.Split(scanner.Text(), ";")
-				//fmt.Println("*",fields)
-				// tiker:field[0],date:field[2],close:field[7]
+				// tiker:field[0], date:field[2], close:field[7]
 				// тикер актива
 				ticker := fields[0]
+				// показать тикер однократно
 				if !once {
 					fmt.Printf("tiker: %s\n",ticker)
 					once = true
@@ -600,7 +608,13 @@ func fillin(rootDir string, summaryTable *SummaryTable) error {
 				//summaryTable[ticker] = append(summaryTable[ticker],date)
 				(*summaryTable).InsertAfter(ticker,date,price)
 			}
-			fmt.Println("Summary len after:",len( (*summaryTable) ))
+			// размер таблицы после изменений 
+			after := len( (*summaryTable) )
+			fmt.Println("Summary len after:",after)
+			// если размер действительно изменился, то увеличить счётчик
+			if before < after {
+				count++
+			}
 		} // eof if-else
 
 		return nil
@@ -632,9 +646,7 @@ func getSortedByLen(summaryTable *SummaryTable, byLen *ByLen) {
 		fmt.Printf("ticker: %s  len:%d   sumlen:%d\n",(*byLen)[i].ticker,(*byLen)[i].length,(*byLen).Len())
 		//fmt.Printf("[%d]: ticker: %s  len:%d\n",i,byLen[i].ticker,byLen[i].length)
 	}
-
-	return
-}
+} // eof func
 
 
 // выровнять таблицу, дополняя нулями попуски для выравнивания таблицы
@@ -677,9 +689,7 @@ func align(summaryTable *SummaryTable, byLen *ByLen, longestTicker string) {
 			}
 		}
 	}
-
-	return
-}
+} // eof func
 
 
 // формирование сводной таблицы
@@ -692,15 +702,13 @@ func build(summaryTable *SummaryTable, byLen *ByLen, longestTicker string) {
 		fmt.Printf("%s%s",";",asset.ticker)
 	}
 	fmt.Println()
+
 	// для каждой строки выражающей дату(день) отобразить значение цены каждого инструмента на эту дату
 	for i := 0; i < (*byLen)[0].length; i++ {
-
 		// получить дату текущую(дату итерации) из наиболее длинной истории
 		date := (*summaryTable)[longestTicker][i].date
-
 		//TODO:(вроде готово)вообще надо нормировку дат произвести чтобы вдруг пустых не было пропуски 
 		// все надо нулями забить в модельной истории перед использованием
-
 		// отображить дату
 		sep := ""
 		fmt.Printf("%s%s",sep,date)
@@ -710,13 +718,15 @@ func build(summaryTable *SummaryTable, byLen *ByLen, longestTicker string) {
 			//fmt.Printf("%s%s",sep,asset.ticker)
 			// тут вообще не должно быть условий, пробегаться по всей строке и всё
 			// воводть цену данного актива на текущую(согласно итерации) дату наболее длинной истории
-			// таблица должна быть уже отформатирована, т.е. все инструменты должны быть соотнесены по дате и добиты нулями
+			// таблица должна быть уже отформатирована, т.е. все инструменты должны 
+			// быть соотнесены по дате и добиты нулями
 			price := (*summaryTable)[asset.ticker][i].price
 			fmt.Printf("%s%f",sep,price)
 		}
 		fmt.Println()
 	}
-}
+} // eof func
+
 
 // привести скачанные данные к виду пригодному для загрузки в решающее устройство
 // здесь надо сформировать на выходе сводную таблицу активов(Assets), в которой все пробелы дополнены нулями
@@ -756,13 +766,11 @@ func transform(rootDir string) {
 	//
 
 	// выровнять таблицу, дополняя нулями попуски для выравнивания таблицы
-	align(&summaryTable, &byLen, longestTicker)
+	//align(&summaryTable, &byLen, longestTicker)
 
 	// сформировать сводную таблицу
-	build(&summaryTable, &byLen, longestTicker)
-
-	return
-}
+	//build(&summaryTable, &byLen, longestTicker)
+} // eof func
 
 
 // convert Finam quotations' prices value to Golang float64
