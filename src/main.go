@@ -545,15 +545,9 @@ func (a ByLen) Less(i, j int) bool { return a[i].length > a[j].length }
 // ------------------
 
 
-// привести скачанные данные к виду пригодному для загрузки в решающее устройство
-// здесь надо сформировать на выходе сводную таблицу активов(Assets), в которой все пробелы дополнены нулями
-func transform(rootDir string) {
-	// сводная таблица активов
-	// строка таблицы - это значения каждого актива на указанную дату либо 0 если значение на дату отсутствует
-	summaryTable := make(SummaryTable)
-
+// заполнить сводную таблицу котировок данными из загруженных файлов
+func fillin(rootDir string, summaryTable *SummaryTable) error {
 	count := 0
-	// заполнить сводную таблицу котировок данными из загруженных файлов
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Printf("prevent panic by handling failure accessing a path %q: %v\n", path, err)
@@ -580,7 +574,7 @@ func transform(rootDir string) {
 			fmt.Println("TIKER:",filepath.Base(path))
 			once := false
 
-			fmt.Println("Summary len before:",len(summaryTable))
+			fmt.Println("Summary len before:",len( (*summaryTable) ))
 			scanner := bufio.NewScanner(file)
 			scanner.Split(bufio.ScanLines)
 			// skip head
@@ -604,36 +598,148 @@ func transform(rootDir string) {
 				//fmt.Printf("tiker: %s date: %q  price: %q[%.4f]\n",fields[0],fields[2],fields[7],floatNum)
 				// https://stackoverflow.com/questions/12677934/create-a-golang-map-of-lists
 				//summaryTable[ticker] = append(summaryTable[ticker],date)
-				summaryTable.InsertAfter(ticker,date,price)
+				(*summaryTable).InsertAfter(ticker,date,price)
 			}
-			fmt.Println("Summary len after:",len(summaryTable))
+			fmt.Println("Summary len after:",len( (*summaryTable) ))
 		} // eof if-else
 
 		return nil
 	})
 
-	// временный массив для сортировки
-	byLen := make(ByLen,len(summaryTable))
+	return err
+}
 
-	// сформировать вспомогательный массив для сортировки по длине истории, чтобы получить значение максимальной длины
+
+// отсортировать наполненную таблицу по длине историй
+func getSortedByLen(summaryTable *SummaryTable, byLen *ByLen) {
+	// сформировать вспомогательный массив для сортировки по длине истории,
+	// чтобы получить значение максимальной длины
 	// и попутно упорядоченный список длин историй инструментов
 	i := 0
 	// map traversal
-	for k,v := range summaryTable {
+	for k,v := range (*summaryTable) {
 		//fmt.Printf("ticker: %s  len:%d sumlen:%d\n",k,len(v),len(summaryTable))
-		byLen[i].ticker = k
-		byLen[i].length = len(v)
+		(*byLen)[i].ticker = k
+		(*byLen)[i].length = len(v)
 		i++
 	}
 	// получить наиболее длинную историю за одно отсортировать истории
 	sort.Sort(byLen)
 
+	//FIXME:DEBUG
 	// отобразить полученные результат
-	for i := 0; i < len(byLen); i++ {
-		fmt.Printf("ticker: %s  len:%d   sumlen:%d\n",byLen[i].ticker,byLen[i].length,byLen.Len())
+	for i := 0; i < len( (*byLen) ); i++ {
+		fmt.Printf("ticker: %s  len:%d   sumlen:%d\n",(*byLen)[i].ticker,(*byLen)[i].length,(*byLen).Len())
 		//fmt.Printf("[%d]: ticker: %s  len:%d\n",i,byLen[i].ticker,byLen[i].length)
 	}
 
+	return
+}
+
+
+// выровнять таблицу, дополняя нулями попуски для выравнивания таблицы
+func align(summaryTable *SummaryTable, byLen *ByLen, longestTicker string) {
+	// выровнять размеры, добивая пропуски нулями для всех инструментов
+	// тут надо соотносить по датам значеиния цены и забивать нулями всё пробелы и пропуски
+	//
+	//	              / 0 если date[i,j] не существует или dete[i,j] младше date[i,0] модельной даты
+	//	price[i,j] = <
+	//	              \ price[i,j] если date[i,j] == date[i,0] - дате наиболее длинной истории
+	// выбрать модельную дату
+	// сравинить модельную дату и дату инструмента
+	// если дата инструмента младше модельной либо её вообще нет то установить значение цены на эту дату 0(нуль)
+	// если дата инструмента равна модельной дате, то установить значение цены на эту дату как цену инструмента считанную из файла котировок инструмента
+	// для каждой строки выражающей дату(день) отобразить значение цены каждого инструмента на эту дату
+	for i := 0; i < (*byLen)[0].length; i++ {
+		// получить дату текущую(дату итерации) из наиболее длинной истории
+		strModelDate := (*summaryTable)[longestTicker][i].date
+		modelDate,_ := toDate(strModelDate)
+
+		// для каждого актива
+		for _,asset := range (*byLen) {
+			// получить дату интсрумента
+			strAssetDate := (*summaryTable)[asset.ticker][i].date
+			assetDate,_ := toDate(strAssetDate)
+
+			// если дата i-го элемента истории младше или старше модельного,
+			// то внести запись в историю на эту дату с нулевой ценой в голову или хвост истории
+			// иначе пропустить(оставить) актуальную цену для текущего актива
+			if modelDate.Before(assetDate) {
+				price := float64(0)
+				(*summaryTable).InsertBefore(asset.ticker,strModelDate,price)
+			} else if assetDate.Before(modelDate) {
+				price := float64(0)
+				(*summaryTable).InsertAfter(asset.ticker,strModelDate,price)
+			} else if i+1 == len( (*summaryTable)[asset.ticker]) {
+				// на всякий случай чтоб за границы не выйти, а то бывало
+				price := float64(0)
+				(*summaryTable).InsertAfter(asset.ticker,strModelDate,price)
+			}
+		}
+	}
+
+	return
+}
+
+
+// формирование сводной таблицы
+func build(summaryTable *SummaryTable, byLen *ByLen, longestTicker string) {
+	// сформирвоать заголовок
+	// поле дата
+	fmt.Printf("DATE")
+	// получить значение тикера для каждого инструмента
+	for _,asset := range (*byLen) {
+		fmt.Printf("%s%s",";",asset.ticker)
+	}
+	fmt.Println()
+	// для каждой строки выражающей дату(день) отобразить значение цены каждого инструмента на эту дату
+	for i := 0; i < (*byLen)[0].length; i++ {
+
+		// получить дату текущую(дату итерации) из наиболее длинной истории
+		date := (*summaryTable)[longestTicker][i].date
+
+		//TODO:(вроде готово)вообще надо нормировку дат произвести чтобы вдруг пустых не было пропуски 
+		// все надо нулями забить в модельной истории перед использованием
+
+		// отображить дату
+		sep := ""
+		fmt.Printf("%s%s",sep,date)
+		sep = ";"
+		// получить значение цены на дату для каждого инструмента
+		for _,asset := range (*byLen) {
+			//fmt.Printf("%s%s",sep,asset.ticker)
+			// тут вообще не должно быть условий, пробегаться по всей строке и всё
+			// воводть цену данного актива на текущую(согласно итерации) дату наболее длинной истории
+			// таблица должна быть уже отформатирована, т.е. все инструменты должны быть соотнесены по дате и добиты нулями
+			price := (*summaryTable)[asset.ticker][i].price
+			fmt.Printf("%s%f",sep,price)
+		}
+		fmt.Println()
+	}
+}
+
+// привести скачанные данные к виду пригодному для загрузки в решающее устройство
+// здесь надо сформировать на выходе сводную таблицу активов(Assets), в которой все пробелы дополнены нулями
+func transform(rootDir string) {
+
+	// сводная таблица активов
+	// строка таблицы - это значения каждого актива на указанную дату либо 0 если значение на дату отсутствует
+	summaryTable := make(SummaryTable)
+
+	// заполнить сводную таблицу котировок данными из загруженных файлов
+	if err := fillin(rootDir, &summaryTable); err != nil {
+		//fmt.Printf("error walking the path %q: %v\n", tmpDir, err)
+		fmt.Println("transform error:",err)
+		return
+	}
+
+	// временный массив для сортировки
+	byLen := make(ByLen,len(summaryTable))
+
+	// отсортировать наполненную таблицу по длине историй во вспомогательный массив
+	getSortedByLen(&summaryTable,&byLen)
+
+	// получить наибольшую длину и тикер с самой длинной историей
 	longestTicker := byLen[0].ticker
 	longetsLen := byLen[0].length
 
@@ -643,92 +749,19 @@ func transform(rootDir string) {
 	// 
 	//TODO:25.04.2019
 	// пока это двухпроходная схема обработки
-	// на первом проходе таблица форматируется таким образом чтобы в строке содеражались значения цен инструментов на дату или нули если истории нет
-	// на втором проходе формируется итоговая сводная таблица содержащая в себе только требуемые данные пригодные для загрузки в матричную бибилиотеку
+	// на первом проходе таблица форматируется таким образом чтобы в строке содеражались 
+	// значения цен инструментов на дату или нули если истории нет
+	// на втором проходе формируется итоговая сводная таблица содержащая в себе только
+	// требуемые данные пригодные для загрузки в матричную бибилиотеку
 	//
 
-	//TODO: выровнять размеры, добивая пропуски нулями для всех инструментов
-	// тут надо соотносить по датам значеиния цены и забивать нулями всё пробелы и пропуски
-	//
-	//	              / 0 если date[i,j] не существует или dete[i,j] младше date[i,0] модельной даты
-	//	price[i,j] = <
-	//	              \ price[i,j] если date[i,j] == date[i,0] - дате наиболее длинной истории
-	// выбрать модельную дату
-	// сравинить модельную дату и дату инструмента
-	// если дата инструмента младше модельной либо её вообще нет то установить значение цены на эту дату 0(нуль)
-	// если дата инструмента младше модельной либо её вообще нет то установить значение цены на эту дату 0(нуль)
-	// если дата инструмента равна модельной дате, то установить значение цены на эту дату как цену инструмента считанную из файла котировок инструмента
-	// для каждой строки выражающей дату(день) отобразить значение цены каждого инструмента на эту дату
-	for i := 0; i < byLen[0].length; i++ {
-		// получить дату текущую(дату итерации) из наиболее длинной истории
-		strModelDate := summaryTable[longestTicker][i].date
-		modelDate,_ := toDate(strModelDate)
+	// выровнять таблицу, дополняя нулями попуски для выравнивания таблицы
+	align(&summaryTable, &byLen, longestTicker)
 
-		// для каждого актива
-		for _,asset := range byLen {
-			// получить дату интсрумента
-			strAssetDate := summaryTable[asset.ticker][i].date
-			assetDate,_ := toDate(strAssetDate)
+	// сформировать сводную таблицу
+	build(&summaryTable, &byLen, longestTicker)
 
-			// если дата i-го элемента истории младше или старше модельного,
-			// то внести запись в историю на эту дату с нулевой цено в голову истории
-			// иначе пропустить(оставить) актуальную цену для текущего актива
-			if modelDate.Before(assetDate) {
-				price := float64(0)
-				summaryTable.InsertBefore(asset.ticker,strModelDate,price)
-			} else if assetDate.Before(modelDate) {
-				price := float64(0)
-				summaryTable.InsertAfter(asset.ticker,strModelDate,price)
-			} else if i+1 == len(summaryTable[asset.ticker]) {
-				// на всякий случай чтоб за границы не выйти, а то бывало
-				price := float64(0)
-				summaryTable.InsertAfter(asset.ticker,strModelDate,price)
-			}
-		}
-	}
-
-	//
-	// формирование сводной таблицы
-	//
-	// сформирвоать заголовок
-	// поле дата
-	fmt.Printf("DATE")
-	// получить значение тикера для каждого инструмента
-	for _,asset := range byLen {
-		fmt.Printf("%s%s",";",asset.ticker)
-	}
-	fmt.Println()
-	// для каждой строки выражающей дату(день) отобразить значение цены каждого инструмента на эту дату
-	for i := 0; i < byLen[0].length; i++ {
-
-		// получить дату текущую(дату итерации) из наиболее длинной истории
-		date := summaryTable[longestTicker][i].date
-
-		//TODO: вообще надо нормировку дат произвести чтобы вдруг пустых не было пропуски 
-		// все надо нулями забить в модельной истории перед использованием
-
-		// отображить дату
-		sep := ""
-		fmt.Printf("%s%s",sep,date)
-		sep = ";"
-		// получить значение цены на дату для каждого инструмента
-		for _,asset := range byLen {
-			//fmt.Printf("%s%s",sep,asset.ticker)
-			// тут вообще не должно быть условий, пробегаться по всей строке и всё
-			// воводть цену данного актива на текущую(согласно итерации) дату наболее длинной истории
-			// таблица должна быть уже отформатирована, т.е. все инструменты должны быть соотнесены по дате и добиты нулями
-			price := summaryTable[asset.ticker][i].price
-			fmt.Printf("%s%f",sep,price)
-		}
-		fmt.Println()
-	}
-
-
-	if err != nil {
-		//fmt.Printf("error walking the path %q: %v\n", tmpDir, err)
-		fmt.Println("transform error:",err)
-		return
-	}
+	return
 }
 
 
